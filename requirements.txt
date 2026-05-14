@@ -1,0 +1,5 @@
+PySide6>=6.6
+pydicom>=2.4
+numpy>=1.26
+scikit-image>=0.22
+pytest>=7.4
