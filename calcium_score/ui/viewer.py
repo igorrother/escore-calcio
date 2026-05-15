@@ -25,8 +25,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..scoring import Lesion, score_flood_fill, score_polygon
-from .roi_tools import artery_color
+from ..scoring import HU_THRESHOLD, Lesion, score_flood_fill, score_polygon
+from .roi_tools import CANDIDATE_COLOR, artery_color
 
 
 @dataclass
@@ -166,6 +166,10 @@ class SliceViewer(QGraphicsView):
         self._pixmap_item = self._scene.addPixmap(QPixmap.fromImage(qimg))
         self._scene.setSceneRect(self._pixmap_item.boundingRect())
 
+        # Draw a translucent tint over candidate calcium that hasn't been
+        # scored yet, so the user can see where to click.
+        self._draw_candidate_overlay(hu_slice)
+
         # Draw overlays for lesions on this slice
         for les in self._lesions_by_slice.get(self.state.current_index, []):
             self._draw_lesion_overlay(les)
@@ -190,6 +194,29 @@ class SliceViewer(QGraphicsView):
         for les in arr:
             out |= les.mask
         return out
+
+    def _draw_candidate_overlay(self, hu_slice: np.ndarray) -> None:
+        """Tint pixels >=130 HU that are not yet part of any ROI on this slice."""
+        candidate = hu_slice >= HU_THRESHOLD
+        if not candidate.any():
+            return
+        existing = self._existing_mask_on_slice(self.state.current_index)
+        if existing is not None:
+            candidate &= ~existing
+            if not candidate.any():
+                return
+        h, w = candidate.shape
+        rgba = np.zeros((h, w, 4), dtype=np.uint8)
+        rgba[candidate, 0] = CANDIDATE_COLOR.red()
+        rgba[candidate, 1] = CANDIDATE_COLOR.green()
+        rgba[candidate, 2] = CANDIDATE_COLOR.blue()
+        rgba[candidate, 3] = CANDIDATE_COLOR.alpha()
+        rgba = np.ascontiguousarray(rgba)
+        qimg = QImage(rgba.data, w, h, w * 4, QImage.Format.Format_RGBA8888).copy()
+        item = self._scene.addPixmap(QPixmap.fromImage(qimg))
+        # Below ROI overlays (zValue=1) but above the slice (default 0)
+        item.setZValue(0.5)
+        self._overlay_items.append(item)
 
     def _draw_lesion_overlay(self, les: Lesion) -> None:
         """Render a translucent colored mask for a lesion."""

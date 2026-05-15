@@ -13,6 +13,11 @@ ARTERY_COLORS: dict[str, QColor] = {
     "PDA": QColor(0, 255, 0, 140),      # green
 }
 
+# Tint applied to pixels >=130 HU that are not yet part of any ROI, so the
+# user can see candidate calcium at a glance. Yellow is intentionally distinct
+# from every artery color above.
+CANDIDATE_COLOR: QColor = QColor(255, 255, 0, 110)
+
 
 def artery_color(artery: str) -> QColor:
     return ARTERY_COLORS.get(artery, QColor(255, 255, 0, 140))
