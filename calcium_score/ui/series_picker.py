@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..series_model import Series, Study, annotate_candidates
+from .score_table import format_dicom_date
 
 _COLUMNS = ["Nº da série", "Descrição", "Fatias", "Espessura (mm)", "kVp", "Candidata"]
 _CANDIDATE_BG = QColor(60, 110, 60)
@@ -106,7 +107,7 @@ class SeriesPickerDialog(QDialog):
         return (
             f"Paciente: {st.patient_name or '(desconhecido)'}    "
             f"ID: {st.patient_id or '—'}    "
-            f"Data do estudo: {st.study_date or '—'}"
+            f"Data do estudo: {format_dicom_date(st.study_date) or '—'}"
         )
 
     def _accept_selection(self) -> None:

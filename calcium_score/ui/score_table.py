@@ -23,6 +23,15 @@ from .roi_tools import artery_color
 _AGE_UNITS = {"Y": "a", "M": "m", "W": "s", "D": "d"}
 
 
+def format_dicom_date(date: str) -> str:
+    """Convert DICOM DA (YYYYMMDD) to DD/MM/YYYY. Pass through anything else."""
+    if not date:
+        return ""
+    if len(date) == 8 and date.isdigit():
+        return f"{date[6:8]}/{date[4:6]}/{date[0:4]}"
+    return date
+
+
 def _format_dicom_age(age: str) -> str:
     """Convert DICOM PatientAge (e.g. '045Y') to a friendlier '45 a' (pt-BR).
 
@@ -164,7 +173,7 @@ class ScoreTable(QWidget):
         text = (
             f"Paciente: {series.patient_name or '(desconhecido)'}{demographics}\n"
             f"ID: {series.patient_id or '—'}\n"
-            f"Data do estudo: {series.study_date or '—'}\n"
+            f"Data do estudo: {format_dicom_date(series.study_date) or '—'}\n"
             f"{series_line}"
         )
         self._patient_lbl.setText(text)
