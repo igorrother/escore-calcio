@@ -5,18 +5,42 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QPalette, QColor
 from PySide6.QtWidgets import (
+    QComboBox,
     QFormLayout,
     QFrame,
     QGridLayout,
+    QHBoxLayout,
     QLabel,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
+from ..mesa_percentile import (
+    parse_dicom_age_years,
+    percentile_bucket,
+)
 from ..scoring import ARTERIES, Lesion, grand_total, risk_category, totals_by_artery
 from ..series_model import Series
 from .roi_tools import artery_color
+
+
+# UI label -> internal MESA race code. "" means "skip percentile".
+RACE_OPTIONS: list[tuple[str, str]] = [
+    ("— não informada", ""),
+    ("Branca", "white"),
+    ("Preta", "black"),
+    ("Hispânica", "hispanic"),
+    ("Chinesa", "chinese"),
+]
+
+_BUCKET_COLORS = {
+    "<25": QColor(120, 200, 120),       # verde
+    "25-50": QColor(170, 210, 130),     # verde-amarelado
+    "50-75": QColor(230, 220, 100),     # amarelo
+    "75-90": QColor(230, 160, 80),      # laranja
+    ">90": QColor(220, 80, 80),         # vermelho
+}
 
 
 # DICOM AS unit -> pt-BR abbreviation: Y/M/W/D = anos/meses/semanas/dias
@@ -142,13 +166,49 @@ class ScoreTable(QWidget):
         self._risk_lbl.setMinimumHeight(30)
         root.addWidget(self._risk_lbl)
 
+        # MESA percentile section
+        sep3 = QFrame()
+        sep3.setFrameShape(QFrame.Shape.HLine)
+        sep3.setFrameShadow(QFrame.Shadow.Sunken)
+        root.addWidget(sep3)
+
+        mesa_title = QLabel("Percentil MESA")
+        mesa_title.setFont(bold)
+        root.addWidget(mesa_title)
+
+        race_row = QHBoxLayout()
+        race_row.addWidget(QLabel("Raça/Etnia:"))
+        self._race_combo = QComboBox()
+        for label, _code in RACE_OPTIONS:
+            self._race_combo.addItem(label)
+        self._race_combo.currentIndexChanged.connect(lambda _i: self._refresh())
+        race_row.addWidget(self._race_combo, stretch=1)
+        root.addLayout(race_row)
+
+        self._percentile_lbl = QLabel("—")
+        self._percentile_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._percentile_lbl.setAutoFillBackground(True)
+        pct_font = QFont()
+        pct_font.setBold(True)
+        pct_font.setPointSize(12)
+        self._percentile_lbl.setFont(pct_font)
+        self._percentile_lbl.setMinimumHeight(30)
+        self._percentile_lbl.setToolTip(
+            "Faixa de percentil MESA (McClelland 2006) para a idade, sexo "
+            "e raça/etnia. Requer idade entre 45 e 84 anos."
+        )
+        root.addWidget(self._percentile_lbl)
+
         root.addStretch(1)
 
+        self._series: Series | None = None
         self._lesions: list[Lesion] = []
 
     def set_series_info(self, series: Series | None) -> None:
+        self._series = series
         if series is None:
             self._patient_lbl.setText("Nenhum estudo carregado")
+            self._refresh()
             return
 
         demo_bits = []
@@ -177,6 +237,7 @@ class ScoreTable(QWidget):
             f"{series_line}"
         )
         self._patient_lbl.setText(text)
+        self._refresh()
 
     def set_lesions(self, lesions: list[Lesion]) -> None:
         self._lesions = list(lesions)
@@ -202,3 +263,37 @@ class ScoreTable(QWidget):
         pal.setColor(QPalette.ColorRole.Window, _RISK_COLORS.get(risk, QColor(180, 180, 180)))
         pal.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
         self._risk_lbl.setPalette(pal)
+
+        self._refresh_percentile(total)
+
+    def _refresh_percentile(self, total: float) -> None:
+        race_code = RACE_OPTIONS[self._race_combo.currentIndex()][1]
+        bucket: str | None = None
+        reason: str = ""
+        if not race_code:
+            reason = "selecione a raça/etnia"
+        elif self._series is None:
+            reason = "abra uma série"
+        else:
+            sex = (self._series.patient_sex or "").upper()
+            if sex not in ("M", "F"):
+                reason = "sexo ausente no DICOM"
+            else:
+                age = parse_dicom_age_years(self._series.patient_age)
+                if age is None:
+                    reason = "idade ausente no DICOM"
+                elif age < 45 or age > 84:
+                    reason = "idade fora de 45–84 (MESA)"
+                else:
+                    bucket = percentile_bucket(total, age, sex, race_code)
+
+        pal = self._percentile_lbl.palette()
+        if bucket is None:
+            self._percentile_lbl.setText(f"— ({reason})" if reason else "—")
+            pal.setColor(QPalette.ColorRole.Window, QColor(70, 70, 70))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor(220, 220, 220))
+        else:
+            self._percentile_lbl.setText(f"Percentil {bucket}")
+            pal.setColor(QPalette.ColorRole.Window, _BUCKET_COLORS.get(bucket, QColor(180, 180, 180)))
+            pal.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
+        self._percentile_lbl.setPalette(pal)
