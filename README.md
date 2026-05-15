@@ -25,7 +25,7 @@ python main.py
 3. Pick the calcium-scoring CT series (candidates are auto-flagged).
 4. Scroll through slices, pick an artery (LM / LAD / LCx / RCA / PDA), pick a tool:
    - **Flood-fill** — click on a calcification; the app grows a region of all touching pixels ≥ 130 HU.
-   - **Polygon** — click vertices around an area, double-click to close; only pixels ≥ 130 HU inside count.
+   - **Free-hand** — click and drag a closed loop around an area; only pixels ≥ 130 HU inside count. Press Esc to cancel mid-draw.
 5. The score table on the right updates live: per-artery totals, grand total Agatston score, risk category.
 
 ## Scoring rules

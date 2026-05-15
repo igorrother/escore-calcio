@@ -104,7 +104,7 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(QLabel(" Tool: "))
         self._tool_combo = QComboBox()
         self._tool_combo.addItem("Flood-fill (click)", userData=SliceViewer.TOOL_FLOOD)
-        self._tool_combo.addItem("Polygon (click vertices, dbl-click closes)", userData=SliceViewer.TOOL_POLYGON)
+        self._tool_combo.addItem("Free-hand (click and drag to draw)", userData=SliceViewer.TOOL_POLYGON)
         toolbar.addWidget(self._tool_combo)
 
         toolbar.addSeparator()

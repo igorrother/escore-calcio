@@ -11,12 +11,14 @@ from PySide6.QtGui import (
     QImage,
     QMouseEvent,
     QPainter,
+    QPainterPath,
     QPen,
     QPixmap,
     QWheelEvent,
 )
 from PySide6.QtWidgets import (
     QGraphicsItem,
+    QGraphicsPathItem,
     QGraphicsPixmapItem,
     QGraphicsScene,
     QGraphicsView,
@@ -92,8 +94,10 @@ class SliceViewer(QGraphicsView):
         self.active_tool: str = self.TOOL_FLOOD
         self.active_artery: str = "LAD"
 
-        # Polygon drafting state
+        # Free-hand polygon drafting state
         self._poly_points: list[QPointF] = []
+        self._drawing_polygon: bool = False
+        self._preview_item: QGraphicsPathItem | None = None
 
         # Right-button window/level drag
         self._wl_start: QPoint | None = None
@@ -116,8 +120,7 @@ class SliceViewer(QGraphicsView):
         if tool not in (self.TOOL_FLOOD, self.TOOL_POLYGON):
             return
         self.active_tool = tool
-        self._poly_points.clear()
-        self._render_slice()  # clear in-progress polygon preview
+        self._cancel_polygon_preview()
 
     def set_artery(self, artery: str) -> None:
         self.active_artery = artery
@@ -130,7 +133,7 @@ class SliceViewer(QGraphicsView):
         if index == self.state.current_index:
             return
         self.state.current_index = index
-        self._poly_points.clear()
+        self._cancel_polygon_preview()
         self._render_slice()
         self.slice_changed.emit(index)
 
@@ -174,16 +177,11 @@ class SliceViewer(QGraphicsView):
         for les in self._lesions_by_slice.get(self.state.current_index, []):
             self._draw_lesion_overlay(les)
 
-        # In-progress polygon preview
-        if self.active_tool == self.TOOL_POLYGON and self._poly_points:
-            pen = QPen(QColor(255, 255, 0))
-            pen.setWidthF(0.3)
-            pts = self._poly_points
-            for i in range(len(pts) - 1):
-                self._scene.addLine(pts[i].x(), pts[i].y(), pts[i + 1].x(), pts[i + 1].y(), pen)
-            # Mark each vertex with a small dot
-            for p in pts:
-                self._scene.addEllipse(p.x() - 0.5, p.y() - 0.5, 1.0, 1.0, pen)
+        # Free-hand polygon preview is managed separately as a persistent
+        # QGraphicsPathItem (see _start/_extend/_cancel_polygon_preview)
+        # because re-rendering the whole scene on every mouse move would
+        # be wasteful. _render_slice clears the scene, so any in-progress
+        # preview is implicitly dropped — callers must cancel first.
 
     def _existing_mask_on_slice(self, slice_idx: int) -> np.ndarray | None:
         """Union of all existing ROI masks on a slice, or None if no ROIs yet."""
@@ -217,6 +215,42 @@ class SliceViewer(QGraphicsView):
         # Below ROI overlays (zValue=1) but above the slice (default 0)
         item.setZValue(0.5)
         self._overlay_items.append(item)
+
+    # ---------- free-hand polygon preview ----------
+    def _start_polygon_preview(self, p: QPointF) -> None:
+        self._cancel_polygon_preview()
+        self._poly_points = [p]
+        self._drawing_polygon = True
+        path = QPainterPath(p)
+        pen = QPen(QColor(255, 255, 0))
+        pen.setWidthF(1.5)  # thick while user is drawing
+        pen.setCosmetic(False)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        item = QGraphicsPathItem(path)
+        item.setPen(pen)
+        item.setZValue(2)
+        self._scene.addItem(item)
+        self._preview_item = item
+
+    def _extend_polygon_preview(self, p: QPointF) -> None:
+        if not self._preview_item or not self._poly_points:
+            return
+        # Skip near-duplicate points to keep the polygon array compact
+        last = self._poly_points[-1]
+        if (p - last).manhattanLength() < 1:
+            return
+        self._poly_points.append(p)
+        path = self._preview_item.path()
+        path.lineTo(p)
+        self._preview_item.setPath(path)
+
+    def _cancel_polygon_preview(self) -> None:
+        self._drawing_polygon = False
+        self._poly_points = []
+        if self._preview_item is not None:
+            self._scene.removeItem(self._preview_item)
+            self._preview_item = None
 
     def _draw_lesion_overlay(self, les: Lesion) -> None:
         """Render a translucent colored mask for a lesion."""
@@ -254,8 +288,7 @@ class SliceViewer(QGraphicsView):
         elif event.key() == Qt.Key.Key_Down or event.key() == Qt.Key.Key_PageDown:
             self.set_slice(self.state.current_index + 1)
         elif event.key() == Qt.Key.Key_Escape:
-            self._poly_points.clear()
-            self._render_slice()
+            self._cancel_polygon_preview()
         else:
             super().keyPressEvent(event)
 
@@ -301,40 +334,9 @@ class SliceViewer(QGraphicsView):
                     return
                 self._add_lesion(les)
             elif self.active_tool == self.TOOL_POLYGON:
-                self._poly_points.append(QPointF(x, y))
-                self._render_slice()
+                self._start_polygon_preview(QPointF(x, y))
 
         super().mousePressEvent(event)
-
-    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
-        if (
-            self.active_tool == self.TOOL_POLYGON
-            and self.state
-            and len(self._poly_points) >= 3
-        ):
-            hu_slice = self.state.hu_volume[self.state.current_index]
-            poly = np.array([[p.x(), p.y()] for p in self._poly_points], dtype=float)
-            les = score_polygon(
-                hu_slice,
-                poly,
-                self.state.pixel_area_mm2,
-                artery=self.active_artery,
-                slice_index=self.state.current_index,
-            )
-            self._poly_points.clear()
-            if les is None:
-                self._render_slice()
-                return
-            existing = self._existing_mask_on_slice(self.state.current_index)
-            if existing is not None and (les.mask & existing).any():
-                self.status_message.emit(
-                    "Polygon overlaps an existing ROI. Undo first if you want to re-score."
-                )
-                self._render_slice()
-                return
-            self._add_lesion(les)
-            return
-        super().mouseDoubleClickEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if not self.state:
@@ -350,13 +352,18 @@ class SliceViewer(QGraphicsView):
             self._render_slice()
             return
 
-        # Emit HU under cursor
         if self._pixmap_item:
             scene_pos = self.mapToScene(event.pos())
             x = int(scene_pos.x())
             y = int(scene_pos.y())
             hu_slice = self.state.hu_volume[self.state.current_index]
-            if 0 <= x < hu_slice.shape[1] and 0 <= y < hu_slice.shape[0]:
+            in_bounds = 0 <= x < hu_slice.shape[1] and 0 <= y < hu_slice.shape[0]
+
+            # Extend the free-hand polygon while the user is dragging.
+            if self._drawing_polygon and in_bounds:
+                self._extend_polygon_preview(QPointF(x, y))
+
+            if in_bounds:
                 self.cursor_hu_changed.emit(x, y, float(hu_slice[y, x]))
 
         super().mouseMoveEvent(event)
@@ -366,7 +373,41 @@ class SliceViewer(QGraphicsView):
             self._wl_start = None
             self._wl_initial = None
             return
+        if event.button() == Qt.MouseButton.LeftButton and self._drawing_polygon:
+            self._finish_polygon_drag()
+            return
         super().mouseReleaseEvent(event)
+
+    def _finish_polygon_drag(self) -> None:
+        """Close the free-hand polygon and score it (or cancel if too small)."""
+        if not self.state:
+            self._cancel_polygon_preview()
+            return
+        points = list(self._poly_points)
+        # Always clear preview before re-rendering the slice
+        self._cancel_polygon_preview()
+        if len(points) < 3:
+            return  # accidental click without a drag
+        hu_slice = self.state.hu_volume[self.state.current_index]
+        poly = np.array([[p.x(), p.y()] for p in points], dtype=float)
+        les = score_polygon(
+            hu_slice,
+            poly,
+            self.state.pixel_area_mm2,
+            artery=self.active_artery,
+            slice_index=self.state.current_index,
+        )
+        if les is None:
+            self._render_slice()
+            return
+        existing = self._existing_mask_on_slice(self.state.current_index)
+        if existing is not None and (les.mask & existing).any():
+            self.status_message.emit(
+                "Polygon overlaps an existing ROI. Undo first if you want to re-score."
+            )
+            self._render_slice()
+            return
+        self._add_lesion(les)
 
     def _add_lesion(self, les: Lesion) -> None:
         self._lesions_by_slice.setdefault(les.slice_index, []).append(les)
