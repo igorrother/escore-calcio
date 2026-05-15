@@ -176,6 +176,31 @@ def score_polygon(
     )
 
 
+def filter_small_components(
+    mask: np.ndarray,
+    pixel_area_mm2: float,
+    min_area_mm2: float = MIN_LESION_AREA_MM2,
+) -> np.ndarray:
+    """Keep only connected components of `mask` whose area is >= min_area_mm2.
+
+    Returns a new boolean array of the same shape with sub-threshold blobs
+    removed. Used to filter image noise out of the candidate-calcium overlay
+    so we don't paint pixels that can never be scored.
+    """
+    if not mask.any() or pixel_area_mm2 <= 0:
+        return mask.astype(bool, copy=True)
+    min_pixels = int(np.ceil(min_area_mm2 / pixel_area_mm2))
+    if min_pixels <= 1:
+        return mask.astype(bool, copy=True)
+    labels = label(mask, connectivity=1)
+    if labels.max() == 0:
+        return mask.astype(bool, copy=True)
+    sizes = np.bincount(labels.ravel())
+    keep = sizes >= min_pixels
+    keep[0] = False  # background label always rejected
+    return keep[labels]
+
+
 def totals_by_artery(lesions: Iterable[Lesion]) -> dict[str, float]:
     """Sum lesion scores grouped by artery, returning every artery (zeros included)."""
     out: dict[str, float] = {a: 0.0 for a in ARTERIES}

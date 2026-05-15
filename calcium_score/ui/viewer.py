@@ -27,7 +27,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..scoring import HU_THRESHOLD, Lesion, score_flood_fill, score_polygon
+from ..scoring import (
+    HU_THRESHOLD,
+    Lesion,
+    filter_small_components,
+    score_flood_fill,
+    score_polygon,
+)
 from .roi_tools import CANDIDATE_COLOR, artery_color
 
 
@@ -227,7 +233,12 @@ class SliceViewer(QGraphicsView):
         self.status_message.emit(f"Erased {hit.artery} ROI.")
 
     def _draw_candidate_overlay(self, hu_slice: np.ndarray) -> None:
-        """Tint pixels >=130 HU that are not yet part of any ROI on this slice."""
+        """Tint pixels >=130 HU that are not yet part of any ROI on this slice.
+
+        Sub-threshold-sized blobs (< 1 mm^2) are filtered out so noise isn't
+        highlighted as a clickable candidate. The pixmap is drawn with
+        FastTransformation so each pixel stays a crisp square at any zoom.
+        """
         candidate = hu_slice >= HU_THRESHOLD
         if not candidate.any():
             return
@@ -236,6 +247,10 @@ class SliceViewer(QGraphicsView):
             candidate &= ~existing
             if not candidate.any():
                 return
+        # Drop noise islands too small to score per Agatston (>= 1 mm^2).
+        candidate = filter_small_components(candidate, self.state.pixel_area_mm2)
+        if not candidate.any():
+            return
         h, w = candidate.shape
         rgba = np.zeros((h, w, 4), dtype=np.uint8)
         rgba[candidate, 0] = CANDIDATE_COLOR.red()
@@ -245,6 +260,7 @@ class SliceViewer(QGraphicsView):
         rgba = np.ascontiguousarray(rgba)
         qimg = QImage(rgba.data, w, h, w * 4, QImage.Format.Format_RGBA8888).copy()
         item = self._scene.addPixmap(QPixmap.fromImage(qimg))
+        item.setTransformationMode(Qt.TransformationMode.FastTransformation)
         # Below ROI overlays (zValue=1) but above the slice (default 0)
         item.setZValue(0.5)
         self._overlay_items.append(item)
@@ -290,7 +306,11 @@ class SliceViewer(QGraphicsView):
             self._preview_item = None
 
     def _draw_lesion_overlay(self, les: Lesion) -> None:
-        """Render a translucent colored mask for a lesion."""
+        """Render a translucent colored mask for a lesion.
+
+        Rendered with FastTransformation so the overlay snaps to the actual
+        scored pixels and doesn't bleed into neighbours when zoomed in.
+        """
         color = artery_color(les.artery)
         mask = les.mask
         h, w = mask.shape
@@ -299,10 +319,10 @@ class SliceViewer(QGraphicsView):
         rgba[mask, 1] = color.green()
         rgba[mask, 2] = color.blue()
         rgba[mask, 3] = color.alpha()
-        # Need a contiguous buffer for QImage
         rgba = np.ascontiguousarray(rgba)
         qimg = QImage(rgba.data, w, h, w * 4, QImage.Format.Format_RGBA8888).copy()
         item = self._scene.addPixmap(QPixmap.fromImage(qimg))
+        item.setTransformationMode(Qt.TransformationMode.FastTransformation)
         item.setZValue(1)
         self._overlay_items.append(item)
 

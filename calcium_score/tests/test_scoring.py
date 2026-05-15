@@ -9,6 +9,7 @@ from calcium_score.scoring import (
     HU_THRESHOLD,
     Lesion,
     density_weight,
+    filter_small_components,
     grand_total,
     hu_from_raw,
     lesion_score,
@@ -187,6 +188,38 @@ class TestAggregation:
     def test_grand_total(self):
         lesions = [self._mk_lesion("LAD", 30.0), self._mk_lesion("RCA", 25.0)]
         assert grand_total(lesions) == 55.0
+
+
+class TestFilterSmallComponents:
+    def test_keeps_only_large_enough_blobs(self):
+        # 1 mm/pixel, threshold 1 mm^2 -> blobs need >=1 pixel (no filter)
+        # Use 0.5 mm/pixel (0.25 mm^2/pixel) -> min 4 pixels for 1 mm^2
+        m = np.zeros((10, 10), dtype=bool)
+        m[2:4, 2:4] = True  # 4-pixel blob (1 mm^2 exactly) -> kept
+        m[6, 6] = True       # 1-pixel blob (0.25 mm^2) -> dropped
+        m[7, 7] = True       # another isolated noise pixel
+        out = filter_small_components(m, pixel_area_mm2=0.25)
+        assert out[2:4, 2:4].all()
+        assert out.sum() == 4  # only the 2x2 blob survives
+
+    def test_no_filter_when_pixel_threshold_is_one(self):
+        # If 1 pixel is already >= min_area_mm2, no filtering happens
+        m = np.zeros((5, 5), dtype=bool)
+        m[2, 2] = True
+        out = filter_small_components(m, pixel_area_mm2=2.0)  # min_pixels = 1
+        assert out[2, 2]
+        assert out.sum() == 1
+
+    def test_empty_mask(self):
+        m = np.zeros((5, 5), dtype=bool)
+        out = filter_small_components(m, pixel_area_mm2=0.25)
+        assert not out.any()
+
+    def test_returns_new_array(self):
+        m = np.zeros((5, 5), dtype=bool)
+        m[1, 1] = True
+        out = filter_small_components(m, pixel_area_mm2=0.25)
+        assert out is not m  # caller can mutate independently
 
 
 class TestHelpers:
