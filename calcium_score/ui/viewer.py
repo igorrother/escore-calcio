@@ -67,6 +67,7 @@ class SliceViewer(QGraphicsView):
     """
 
     lesion_added = Signal(Lesion)
+    lesions_changed = Signal()  # emitted on undo, reassignment, clear-all
     slice_changed = Signal(int)
     cursor_hu_changed = Signal(int, int, float)
     status_message = Signal(str)
@@ -200,6 +201,13 @@ class SliceViewer(QGraphicsView):
             out |= les.mask
         return out
 
+    def _lesion_at(self, slice_idx: int, y: int, x: int) -> Lesion | None:
+        """Return the lesion on this slice whose mask contains pixel (y, x), or None."""
+        for les in self._lesions_by_slice.get(slice_idx, []):
+            if 0 <= y < les.mask.shape[0] and 0 <= x < les.mask.shape[1] and les.mask[y, x]:
+                return les
+        return None
+
     def _draw_candidate_overlay(self, hu_slice: np.ndarray) -> None:
         """Tint pixels >=130 HU that are not yet part of any ROI on this slice."""
         candidate = hu_slice >= HU_THRESHOLD
@@ -323,12 +331,25 @@ class SliceViewer(QGraphicsView):
                 return
 
             if self.active_tool == self.TOOL_FLOOD:
-                existing = self._existing_mask_on_slice(self.state.current_index)
-                if existing is not None and existing[y, x]:
+                # If the click landed on an existing ROI, reassign that
+                # lesion to the active artery (or no-op if it's already
+                # this artery) instead of trying to add a duplicate.
+                hit = self._lesion_at(self.state.current_index, y, x)
+                if hit is not None:
+                    if hit.artery == self.active_artery:
+                        self.status_message.emit(
+                            f"This ROI is already assigned to {hit.artery}."
+                        )
+                        return
+                    old = hit.artery
+                    hit.artery = self.active_artery
+                    self._render_slice()
+                    self.lesions_changed.emit()
                     self.status_message.emit(
-                        "That pixel is already part of an existing ROI. Undo first if you want to re-score."
+                        f"Reassigned ROI from {old} to {self.active_artery}."
                     )
                     return
+
                 les = score_flood_fill(
                     hu_slice,
                     (y, x),
@@ -338,9 +359,10 @@ class SliceViewer(QGraphicsView):
                 )
                 if les is None:
                     return
+                existing = self._existing_mask_on_slice(self.state.current_index)
                 if existing is not None and (les.mask & existing).any():
                     self.status_message.emit(
-                        "This calcification overlaps an existing ROI. Undo first if you want to re-score."
+                        "This calcification touches an existing ROI. Undo first if you want to re-score."
                     )
                     return
                 self._add_lesion(les)

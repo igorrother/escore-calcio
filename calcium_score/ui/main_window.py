@@ -6,7 +6,15 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QDragEnterEvent, QDragMoveEvent, QDropEvent, QPalette, QColor
+from PySide6.QtGui import (
+    QAction,
+    QActionGroup,
+    QColor,
+    QDragEnterEvent,
+    QDragMoveEvent,
+    QDropEvent,
+    QPalette,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -27,6 +35,7 @@ from ..dicom_loader import load_input, load_pixel_volume
 from ..scoring import ARTERIES, Lesion
 from ..series_model import Series, Study
 from .disclaimer import AboutDialog
+from .roi_tools import artery_icon
 from .score_table import ScoreTable
 from .series_picker import SeriesPickerDialog
 from .viewer import SliceIndexLabel, SliceViewer
@@ -95,10 +104,19 @@ class MainWindow(QMainWindow):
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         toolbar.addWidget(QLabel(" Artery: "))
-        self._artery_combo = QComboBox()
-        self._artery_combo.addItems(ARTERIES)
-        self._artery_combo.setCurrentText("LAD")
-        toolbar.addWidget(self._artery_combo)
+        self._artery_actions: dict[str, QAction] = {}
+        self._artery_group = QActionGroup(self)
+        self._artery_group.setExclusive(True)
+        for artery in ARTERIES:
+            act = QAction(artery_icon(artery, size=28), artery, self)
+            act.setCheckable(True)
+            act.setToolTip(f"Score as {artery}")
+            act.setData(artery)
+            self._artery_group.addAction(act)
+            toolbar.addAction(act)
+            self._artery_actions[artery] = act
+        self._artery_actions["LAD"].setChecked(True)
+        toolbar.setIconSize(toolbar.iconSize().expandedTo(toolbar.iconSize() * 1.2))
 
         toolbar.addSeparator()
         toolbar.addWidget(QLabel(" Tool: "))
@@ -132,9 +150,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         # Wire signals
-        self._artery_combo.currentTextChanged.connect(self._viewer.set_artery)
+        self._artery_group.triggered.connect(self._on_artery_changed)
         self._tool_combo.currentIndexChanged.connect(self._on_tool_changed)
         self._viewer.lesion_added.connect(self._on_lesion_added)
+        self._viewer.lesions_changed.connect(self._on_lesions_changed)
         self._viewer.slice_changed.connect(self._on_slice_changed)
         self._viewer.cursor_hu_changed.connect(self._on_cursor_hu)
         self._viewer.status_message.connect(self._on_status_message)
@@ -148,10 +167,15 @@ class MainWindow(QMainWindow):
         bar.addWidget(self._hu_lbl)
 
     def _set_tools_enabled(self, enabled: bool) -> None:
-        self._artery_combo.setEnabled(enabled)
+        for act in self._artery_actions.values():
+            act.setEnabled(enabled)
         self._tool_combo.setEnabled(enabled)
         self._undo_btn.setEnabled(enabled)
         self._clear_btn.setEnabled(enabled)
+
+    def _current_artery(self) -> str:
+        checked = self._artery_group.checkedAction()
+        return checked.data() if checked is not None else "LAD"
 
     # ---------- actions ----------
     def _open_folder(self) -> None:
@@ -224,7 +248,7 @@ class MainWindow(QMainWindow):
 
         self._current_series = series
         self._viewer.load_volume(hu_volume, series.pixel_spacing)
-        self._viewer.set_artery(self._artery_combo.currentText())
+        self._viewer.set_artery(self._current_artery())
         self._viewer.set_tool(self._tool_combo.currentData())
         self._score_table.clear_lesions()
         self._score_table.set_series_info(series)
@@ -246,8 +270,17 @@ class MainWindow(QMainWindow):
         if tool:
             self._viewer.set_tool(tool)
 
+    def _on_artery_changed(self, action: QAction) -> None:
+        artery = action.data()
+        if artery:
+            self._viewer.set_artery(artery)
+
     def _on_lesion_added(self, les: Lesion) -> None:
         self._score_table.add_lesion(les)
+
+    def _on_lesions_changed(self) -> None:
+        # Triggered by reassignment, undo, or any non-additive change.
+        self._score_table.set_lesions(self._viewer.lesions())
 
     def _on_slice_changed(self, idx: int) -> None:
         if self._viewer.state:
