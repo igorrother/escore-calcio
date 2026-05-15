@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__
+from .. import __author__, __version__
 
 DISCLAIMER_TEXT = (
     "Este software é fornecido apenas para fins de pesquisa e ensino.\n\n"
@@ -41,6 +41,12 @@ class AboutDialog(QDialog):
         font.setPointSize(13)
         title.setFont(font)
         layout.addWidget(title)
+
+        author = QLabel(f"Desenvolvido por {__author__}")
+        author_font = QFont()
+        author_font.setItalic(True)
+        author.setFont(author_font)
+        layout.addWidget(author)
 
         body = QLabel(DISCLAIMER_TEXT)
         body.setWordWrap(True)
