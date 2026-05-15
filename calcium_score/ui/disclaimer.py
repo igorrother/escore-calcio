@@ -1,4 +1,4 @@
-"""Startup disclaimer and About dialog."""
+"""About dialog and the research-use-only disclaimer text."""
 
 from __future__ import annotations
 
@@ -25,39 +25,8 @@ DISCLAIMER_TEXT = (
 )
 
 
-class DisclaimerDialog(QDialog):
-    """Modal startup disclaimer the user must explicitly accept."""
-
-    def __init__(self, parent: QWidget | None = None):
-        super().__init__(parent)
-        self.setWindowTitle("Research / educational use only")
-        self.setModal(True)
-        self.resize(560, 320)
-
-        layout = QVBoxLayout(self)
-
-        title = QLabel("Agatston Calcium Score — Research Tool")
-        font = QFont()
-        font.setBold(True)
-        font.setPointSize(13)
-        title.setFont(font)
-        layout.addWidget(title)
-
-        body = QLabel(DISCLAIMER_TEXT)
-        body.setWordWrap(True)
-        body.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        layout.addWidget(body)
-
-        buttons = QDialogButtonBox(self)
-        accept = buttons.addButton("I understand", QDialogButtonBox.ButtonRole.AcceptRole)
-        cancel = buttons.addButton("Quit", QDialogButtonBox.ButtonRole.RejectRole)
-        accept.clicked.connect(self.accept)
-        cancel.clicked.connect(self.reject)
-        layout.addWidget(buttons)
-
-
 class AboutDialog(QDialog):
-    """Help -> About dialog."""
+    """Help -> About dialog. Holds the research-use-only disclaimer text."""
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -79,9 +48,6 @@ class AboutDialog(QDialog):
         layout.addWidget(body)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close, self)
-        buttons.rejected.connect(self.reject)
-        buttons.accepted.connect(self.accept)
-        # Close button uses the "rejected" signal in some Qt versions; wire both:
         for btn in buttons.buttons():
             btn.clicked.connect(self.accept)
         layout.addWidget(buttons)
