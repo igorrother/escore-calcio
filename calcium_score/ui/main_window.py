@@ -35,7 +35,12 @@ from ..dicom_loader import load_input, load_pixel_volume
 from ..scoring import ARTERIES, Lesion
 from ..series_model import Series, Study
 from .disclaimer import AboutDialog
-from .roi_tools import artery_icon, eraser_icon, eye_open_icon
+from .roi_tools import (
+    artery_icon,
+    eraser_icon,
+    overlay_all_eye_icon,
+    overlay_candidate_eye_icon,
+)
 from .score_table import ScoreTable
 from .series_picker import SeriesPickerDialog
 from .viewer import SliceIndexLabel, SliceViewer
@@ -136,7 +141,7 @@ class MainWindow(QMainWindow):
         toolbar.addAction(self._eraser_action)
 
         toolbar.addSeparator()
-        self._show_all_action = QAction(eye_open_icon(32), "Mostrar overlays", self)
+        self._show_all_action = QAction(overlay_all_eye_icon(32), "Mostrar overlays", self)
         self._show_all_action.setCheckable(True)
         self._show_all_action.setChecked(True)
         self._show_all_action.setToolTip(
@@ -146,7 +151,7 @@ class MainWindow(QMainWindow):
         self._show_all_action.toggled.connect(self._on_show_all_toggled)
         toolbar.addAction(self._show_all_action)
 
-        self._show_candidate_action = QAction(eye_open_icon(32), "Mostrar marcação candidata", self)
+        self._show_candidate_action = QAction(overlay_candidate_eye_icon(32), "Mostrar marcação candidata", self)
         self._show_candidate_action.setCheckable(True)
         self._show_candidate_action.setChecked(True)
         self._show_candidate_action.setToolTip(

@@ -29,72 +29,95 @@ def artery_color(artery: str) -> QColor:
     return ARTERY_COLORS.get(artery, QColor(255, 255, 255, 140))
 
 
-def eye_open_icon(size: int = 32) -> QIcon:
-    """A simple monochrome 'eye open' icon for overlay-visibility toggles."""
+def _draw_eye_outline(painter: QPainter, size: int) -> tuple[float, float]:
+    """Draw the eye almond + return (iris_size, iris_origin) for caller."""
+    pen = QPen(QColor(230, 230, 230), 1.6)
+    painter.setPen(pen)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    almond_w = size * 0.86
+    almond_h = size * 0.46
+    painter.drawEllipse(
+        (size - almond_w) / 2,
+        (size - almond_h) / 2,
+        almond_w,
+        almond_h,
+    )
+    iris = size * 0.36
+    iris_origin = (size - iris) / 2
+    return iris, iris_origin
+
+
+def _draw_pupil(painter: QPainter, size: int) -> None:
+    """Center pupil dot, drawn last so it sits over the iris."""
+    painter.setBrush(QColor(20, 20, 20))
+    painter.setPen(Qt.PenStyle.NoPen)
+    pupil = size * 0.14
+    painter.drawEllipse(
+        (size - pupil) / 2,
+        (size - pupil) / 2,
+        pupil,
+        pupil,
+    )
+
+
+def overlay_all_eye_icon(size: int = 32) -> QIcon:
+    """Eye icon with a 4-quadrant artery-colored iris.
+
+    Used for the toolbar toggle that controls visibility of ALL overlays.
+    The four quadrants pick the four most-distinct artery colors so the
+    icon reads as "shows all the colored overlays".
+    """
     pix = QPixmap(size, size)
     pix.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pix)
     try:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        # Almond-shaped outline approximated with an ellipse.
-        pen = QPen(QColor(230, 230, 230), 1.6)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        almond_w = size * 0.78
-        almond_h = size * 0.42
-        painter.drawEllipse(
-            (size - almond_w) / 2,
-            (size - almond_h) / 2,
-            almond_w,
-            almond_h,
-        )
-        # Iris + pupil.
-        painter.setBrush(QColor(80, 140, 220))
-        painter.setPen(QPen(QColor(40, 80, 140), 1.0))
-        iris = size * 0.28
-        painter.drawEllipse(
-            (size - iris) / 2,
-            (size - iris) / 2,
-            iris,
-            iris,
-        )
-        painter.setBrush(QColor(20, 20, 20))
-        painter.setPen(Qt.PenStyle.NoPen)
-        pupil = size * 0.12
-        painter.drawEllipse(
-            (size - pupil) / 2,
-            (size - pupil) / 2,
-            pupil,
-            pupil,
-        )
+        iris, origin = _draw_eye_outline(painter, size)
+        # Pie slices in 4 representative artery colors.
+        # Qt drawPie angles are in 1/16 degrees, 0° = 3 o'clock, CCW.
+        quadrant_colors = [
+            QColor(*ARTERY_RGB["DA"]),    # top-right    (red)
+            QColor(*ARTERY_RGB["TCE"]),   # top-left     (blue)
+            QColor(*ARTERY_RGB["DP"]),    # bottom-left  (green)
+            QColor(*ARTERY_RGB["Cx"]),    # bottom-right (yellow)
+        ]
+        painter.setPen(QPen(QColor(40, 40, 40), 0.7))
+        for i, color in enumerate(quadrant_colors):
+            painter.setBrush(color)
+            painter.drawPie(
+                int(origin), int(origin), int(iris), int(iris),
+                int(i * 90 * 16), int(90 * 16),
+            )
+        _draw_pupil(painter, size)
     finally:
         painter.end()
     return QIcon(pix)
 
 
-def eye_closed_icon(size: int = 32) -> QIcon:
-    """A simple monochrome 'eye closed' icon (closed eyelid + lashes)."""
+def overlay_candidate_eye_icon(size: int = 32) -> QIcon:
+    """Eye icon with a solid pink iris — matches CANDIDATE_COLOR.
+
+    Used for the toolbar toggle that controls visibility of ONLY the
+    candidate (pink) overlay.
+    """
     pix = QPixmap(size, size)
     pix.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pix)
     try:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(QColor(220, 220, 220), 1.8)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-        # Closed-eyelid curve (a shallow arc).
-        margin = size * 0.12
-        rect_x = margin
-        rect_y = size * 0.30
-        rect_w = size - 2 * margin
-        rect_h = size * 0.40
-        painter.drawArc(int(rect_x), int(rect_y), int(rect_w), int(rect_h), 0 * 16, 180 * 16)
-        # Three short eyelashes hanging down from the arc.
-        cy = rect_y + rect_h / 2
-        for dx, dy in [(-0.30, 0.18), (0.0, 0.22), (0.30, 0.18)]:
-            x0 = size / 2 + dx * size
-            y0 = cy + 2
-            painter.drawLine(int(x0), int(y0), int(x0 + dy * size * 0.4), int(y0 + dy * size * 1.0))
+        iris, origin = _draw_eye_outline(painter, size)
+        # Solid pink iris — same color as the candidate overlay tint
+        # (opaque here so the icon reads clearly at 32 px).
+        candidate_solid = QColor(
+            CANDIDATE_COLOR.red(),
+            CANDIDATE_COLOR.green(),
+            CANDIDATE_COLOR.blue(),
+            255,
+        )
+        painter.setBrush(candidate_solid)
+        painter.setPen(QPen(QColor(40, 40, 40), 0.7))
+        painter.drawEllipse(int(origin), int(origin), int(iris), int(iris))
+        _draw_pupil(painter, size)
     finally:
         painter.end()
     return QIcon(pix)
