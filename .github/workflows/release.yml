@@ -1,0 +1,121 @@
+name: Build & release
+
+# Triggers:
+#   - Push a tag like v1.0, v1.1, ... -> builds both platforms AND creates
+#     a GitHub Release with the artifacts attached.
+#   - Manual "Run workflow" button -> builds both platforms, uploads
+#     artifacts to the run page (no Release created).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows (x86_64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        shell: cmd
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run tests
+        shell: cmd
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest
+
+      - name: Build .exe with PyInstaller
+        shell: cmd
+        run: pyinstaller --noconfirm score_app.spec
+
+      - name: Package as versioned zip
+        shell: cmd
+        run: python tools\package.py
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EscoreCalcio-windows
+          path: dist/EscoreCalcio-v*.zip
+          if-no-files-found: error
+
+  mac:
+    name: macOS (Apple Silicon, arm64)
+    # macos-latest is Apple Silicon (arm64) on GitHub-hosted runners since
+    # late 2024. macos-13 is the last Intel image if Intel support is
+    # needed later — add a second job with `runs-on: macos-13`.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest
+
+      - name: Build .app with PyInstaller
+        run: pyinstaller --noconfirm score_app_mac.spec
+
+      - name: Zip the .app
+        run: |
+          set -euo pipefail
+          VERSION=$(python -c 'from calcium_score import __version__; print(__version__)')
+          ARCH=$(uname -m)
+          ZIP_NAME="EscoreCalcio-v${VERSION}-mac-${ARCH}.zip"
+          cd dist
+          # ditto preserves macOS metadata/symlinks better than zip(1).
+          ditto -c -k --sequesterRsrc --keepParent "EscoreCalcio.app" "${ZIP_NAME}"
+          echo "Wrote dist/${ZIP_NAME}"
+          ls -lh "${ZIP_NAME}"
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: EscoreCalcio-mac
+          path: dist/EscoreCalcio-v*-mac-*.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: [windows, mac]
+    # Only run on a tag push, not on manual dispatch — manual runs just
+    # produce artifacts on the run page for testing.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/EscoreCalcio-windows/*.zip
+            artifacts/EscoreCalcio-mac/*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: true
