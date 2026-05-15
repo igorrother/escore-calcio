@@ -82,6 +82,9 @@ class SliceViewer(QGraphicsView):
         self.setMouseTracking(True)
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
         self.setBackgroundBrush(QColor(0, 0, 0))
+        # QGraphicsView enables acceptDrops by default for scene drag-and-drop.
+        # We don't use that, so disable it so file drops bubble up to MainWindow.
+        self.setAcceptDrops(False)
 
         self._pixmap_item: QGraphicsPixmapItem | None = None
         self._overlay_items: list[QGraphicsItem] = []
@@ -94,9 +97,13 @@ class SliceViewer(QGraphicsView):
         self.active_tool: str = self.TOOL_FLOOD
         self.active_artery: str = "LAD"
 
-        # Free-hand polygon drafting state
+        # Free-hand polygon drafting state. The path is the source of truth;
+        # the QGraphicsPathItem is just its on-screen representation. Going
+        # the other way (reading item.path() back) drops a moveTo-only path
+        # in PySide6, which previously caused a stray line from (0,0).
         self._poly_points: list[QPointF] = []
         self._drawing_polygon: bool = False
+        self._preview_path: QPainterPath | None = None
         self._preview_item: QGraphicsPathItem | None = None
 
         # Right-button window/level drag
@@ -221,33 +228,37 @@ class SliceViewer(QGraphicsView):
         self._cancel_polygon_preview()
         self._poly_points = [p]
         self._drawing_polygon = True
-        path = QPainterPath(p)
+        self._preview_path = QPainterPath()
+        self._preview_path.moveTo(p)
         pen = QPen(QColor(255, 255, 0))
         pen.setWidthF(1.5)  # thick while user is drawing
         pen.setCosmetic(False)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        item = QGraphicsPathItem(path)
+        item = QGraphicsPathItem(self._preview_path)
         item.setPen(pen)
         item.setZValue(2)
         self._scene.addItem(item)
         self._preview_item = item
 
     def _extend_polygon_preview(self, p: QPointF) -> None:
-        if not self._preview_item or not self._poly_points:
+        if (
+            self._preview_item is None
+            or self._preview_path is None
+            or not self._poly_points
+        ):
             return
-        # Skip near-duplicate points to keep the polygon array compact
         last = self._poly_points[-1]
         if (p - last).manhattanLength() < 1:
             return
         self._poly_points.append(p)
-        path = self._preview_item.path()
-        path.lineTo(p)
-        self._preview_item.setPath(path)
+        self._preview_path.lineTo(p)
+        self._preview_item.setPath(self._preview_path)
 
     def _cancel_polygon_preview(self) -> None:
         self._drawing_polygon = False
         self._poly_points = []
+        self._preview_path = None
         if self._preview_item is not None:
             self._scene.removeItem(self._preview_item)
             self._preview_item = None
