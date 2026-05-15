@@ -136,6 +136,7 @@ class MainWindow(QMainWindow):
         self._viewer.lesion_added.connect(self._on_lesion_added)
         self._viewer.slice_changed.connect(self._on_slice_changed)
         self._viewer.cursor_hu_changed.connect(self._on_cursor_hu)
+        self._viewer.status_message.connect(self._on_status_message)
 
     def _build_status_bar(self) -> None:
         bar = QStatusBar(self)
@@ -254,6 +255,9 @@ class MainWindow(QMainWindow):
 
     def _on_cursor_hu(self, x: int, y: int, hu: float) -> None:
         self._hu_lbl.setText(f"x={x}, y={y}, HU={hu:.0f}")
+
+    def _on_status_message(self, text: str) -> None:
+        self.statusBar().showMessage(text, 4000)
 
     def _undo_last(self) -> None:
         removed = self._viewer.remove_last_lesion()

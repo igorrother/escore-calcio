@@ -67,6 +67,7 @@ class SliceViewer(QGraphicsView):
     lesion_added = Signal(Lesion)
     slice_changed = Signal(int)
     cursor_hu_changed = Signal(int, int, float)
+    status_message = Signal(str)
 
     TOOL_FLOOD = "flood"
     TOOL_POLYGON = "polygon"
@@ -180,6 +181,16 @@ class SliceViewer(QGraphicsView):
             for p in pts:
                 self._scene.addEllipse(p.x() - 0.5, p.y() - 0.5, 1.0, 1.0, pen)
 
+    def _existing_mask_on_slice(self, slice_idx: int) -> np.ndarray | None:
+        """Union of all existing ROI masks on a slice, or None if no ROIs yet."""
+        arr = self._lesions_by_slice.get(slice_idx, [])
+        if not arr:
+            return None
+        out = np.zeros_like(arr[0].mask)
+        for les in arr:
+            out |= les.mask
+        return out
+
     def _draw_lesion_overlay(self, les: Lesion) -> None:
         """Render a translucent colored mask for a lesion."""
         color = artery_color(les.artery)
@@ -241,6 +252,12 @@ class SliceViewer(QGraphicsView):
                 return
 
             if self.active_tool == self.TOOL_FLOOD:
+                existing = self._existing_mask_on_slice(self.state.current_index)
+                if existing is not None and existing[y, x]:
+                    self.status_message.emit(
+                        "That pixel is already part of an existing ROI. Undo first if you want to re-score."
+                    )
+                    return
                 les = score_flood_fill(
                     hu_slice,
                     (y, x),
@@ -248,8 +265,14 @@ class SliceViewer(QGraphicsView):
                     artery=self.active_artery,
                     slice_index=self.state.current_index,
                 )
-                if les is not None:
-                    self._add_lesion(les)
+                if les is None:
+                    return
+                if existing is not None and (les.mask & existing).any():
+                    self.status_message.emit(
+                        "This calcification overlaps an existing ROI. Undo first if you want to re-score."
+                    )
+                    return
+                self._add_lesion(les)
             elif self.active_tool == self.TOOL_POLYGON:
                 self._poly_points.append(QPointF(x, y))
                 self._render_slice()
@@ -272,10 +295,17 @@ class SliceViewer(QGraphicsView):
                 slice_index=self.state.current_index,
             )
             self._poly_points.clear()
-            if les is not None:
-                self._add_lesion(les)
-            else:
+            if les is None:
                 self._render_slice()
+                return
+            existing = self._existing_mask_on_slice(self.state.current_index)
+            if existing is not None and (les.mask & existing).any():
+                self.status_message.emit(
+                    "Polygon overlaps an existing ROI. Undo first if you want to re-score."
+                )
+                self._render_slice()
+                return
+            self._add_lesion(les)
             return
         super().mouseDoubleClickEvent(event)
 
