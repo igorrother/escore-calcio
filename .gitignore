@@ -36,3 +36,9 @@ Thumbs.db
 *.zip
 sample_data/
 data/
+
+reference/
+
+# Local build helpers — CI handles releases via .github/workflows.
+# Keep .bat files on disk for fast local smoke-test builds, just don't track them.
+*.bat
