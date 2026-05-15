@@ -36,6 +36,8 @@ def _make_ct_slice(
     ds = FileDataset(str(path), {}, file_meta=file_meta, preamble=b"\0" * 128)
     ds.PatientName = "Test^Patient"
     ds.PatientID = "TEST001"
+    ds.PatientAge = "045Y"
+    ds.PatientSex = "M"
     ds.StudyDate = "20260101"
     ds.StudyInstanceUID = study_uid
     ds.SeriesInstanceUID = series_uid
@@ -135,6 +137,8 @@ class TestLoadFromFolder:
         studies = load_input(two_series_folder)
         assert studies[0].patient_name == "Test^Patient"
         assert studies[0].patient_id == "TEST001"
+        assert studies[0].patient_age == "045Y"
+        assert studies[0].patient_sex == "M"
         assert studies[0].study_date == "20260101"
 
     def test_skips_non_dicom_files(self, two_series_folder: Path):

@@ -18,6 +18,27 @@ from ..scoring import ARTERIES, Lesion, grand_total, risk_category, totals_by_ar
 from ..series_model import Series
 from .roi_tools import artery_color
 
+
+_AGE_UNITS = {"Y": "y", "M": "mo", "W": "w", "D": "d"}
+
+
+def _format_dicom_age(age: str) -> str:
+    """Convert DICOM PatientAge (e.g. '045Y') to a friendlier '45 y'.
+
+    DICOM AS format: 3 digits + Y/M/W/D unit. Returns the input unchanged
+    if it doesn't match the expected pattern, and "" if input is falsy.
+    """
+    if not age:
+        return ""
+    if len(age) < 4:
+        return age
+    try:
+        n = int(age[:3])
+    except ValueError:
+        return age
+    suffix = _AGE_UNITS.get(age[3].upper(), age[3].lower())
+    return f"{n} {suffix}"
+
 _RISK_COLORS = {
     "none": QColor(120, 200, 120),
     "minimal": QColor(120, 170, 220),
@@ -117,15 +138,31 @@ class ScoreTable(QWidget):
         if series is None:
             self._patient_lbl.setText("No study loaded")
             return
+
+        demo_bits = []
+        if series.patient_sex:
+            demo_bits.append(series.patient_sex)
+        age = _format_dicom_age(series.patient_age)
+        if age:
+            demo_bits.append(age)
+        demographics = f"  ({', '.join(demo_bits)})" if demo_bits else ""
+
+        if series.slice_thickness is not None:
+            series_line = (
+                f"Series: {series.series_description or '(no description)'} "
+                f"({series.num_slices} slices, {series.slice_thickness:g} mm)"
+            )
+        else:
+            series_line = (
+                f"Series: {series.series_description or '(no description)'} "
+                f"({series.num_slices} slices)"
+            )
+
         text = (
-            f"Patient: {series.patient_name or '(unknown)'}\n"
+            f"Patient: {series.patient_name or '(unknown)'}{demographics}\n"
             f"ID: {series.patient_id or '—'}\n"
             f"Study date: {series.study_date or '—'}\n"
-            f"Series: {series.series_description or '(no description)'} "
-            f"({series.num_slices} slices, "
-            f"{series.slice_thickness:g} mm)"
-            if series.slice_thickness is not None
-            else f"Series: {series.series_description or '(no description)'} ({series.num_slices} slices)"
+            f"{series_line}"
         )
         self._patient_lbl.setText(text)
 

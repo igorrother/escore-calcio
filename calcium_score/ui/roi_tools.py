@@ -28,6 +28,29 @@ def artery_color(artery: str) -> QColor:
     return ARTERY_COLORS.get(artery, QColor(255, 255, 255, 140))
 
 
+def eraser_icon(size: int = 32) -> QIcon:
+    """A small pink-block eraser icon for the toolbar."""
+    pix = QPixmap(size, size)
+    pix.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pix)
+    try:
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.translate(size / 2, size / 2)
+        painter.rotate(-25)
+        # Eraser body (pink)
+        painter.setBrush(QColor(255, 170, 175))
+        painter.setPen(QPen(QColor(30, 30, 30), 1.2))
+        body_w, body_h = size * 0.72, size * 0.34
+        painter.drawRoundedRect(-body_w / 2, -body_h / 2, body_w, body_h, 3, 3)
+        # Metal band on the left side (the classic two-tone pencil eraser look)
+        painter.setBrush(QColor(180, 180, 180))
+        band_w = size * 0.14
+        painter.drawRect(-body_w / 2 + body_w * 0.05, -body_h / 2, band_w, body_h)
+    finally:
+        painter.end()
+    return QIcon(pix)
+
+
 def artery_icon(artery: str, size: int = 32) -> QIcon:
     """Solid colored circle icon labeled with the artery abbreviation."""
     pix = QPixmap(size, size)

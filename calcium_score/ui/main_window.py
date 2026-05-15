@@ -35,7 +35,7 @@ from ..dicom_loader import load_input, load_pixel_volume
 from ..scoring import ARTERIES, Lesion
 from ..series_model import Series, Study
 from .disclaimer import AboutDialog
-from .roi_tools import artery_icon
+from .roi_tools import artery_icon, eraser_icon
 from .score_table import ScoreTable
 from .series_picker import SeriesPickerDialog
 from .viewer import SliceIndexLabel, SliceViewer
@@ -124,8 +124,16 @@ class MainWindow(QMainWindow):
         self._tool_combo = QComboBox()
         self._tool_combo.addItem("Flood-fill (click)", userData=SliceViewer.TOOL_FLOOD)
         self._tool_combo.addItem("Free-hand (click and drag to draw)", userData=SliceViewer.TOOL_POLYGON)
-        self._tool_combo.addItem("Eraser (click an ROI to remove it)", userData=SliceViewer.TOOL_ERASER)
         toolbar.addWidget(self._tool_combo)
+
+        toolbar.addSeparator()
+        self._eraser_action = QAction(eraser_icon(32), "Eraser", self)
+        self._eraser_action.setCheckable(True)
+        self._eraser_action.setToolTip(
+            "Eraser — click an ROI to remove it. Toggle off to return to drawing."
+        )
+        self._eraser_action.toggled.connect(self._on_eraser_toggled)
+        toolbar.addAction(self._eraser_action)
 
         toolbar.addSeparator()
         self._undo_btn = QPushButton("Undo last ROI (this slice)")
@@ -171,7 +179,8 @@ class MainWindow(QMainWindow):
     def _set_tools_enabled(self, enabled: bool) -> None:
         for act in self._artery_actions.values():
             act.setEnabled(enabled)
-        self._tool_combo.setEnabled(enabled)
+        self._tool_combo.setEnabled(enabled and not self._eraser_action.isChecked())
+        self._eraser_action.setEnabled(enabled)
         self._undo_btn.setEnabled(enabled)
         self._clear_btn.setEnabled(enabled)
 
@@ -268,8 +277,19 @@ class MainWindow(QMainWindow):
         )
 
     def _on_tool_changed(self, _index: int) -> None:
+        if self._eraser_action.isChecked():
+            return  # eraser is active; combo selection is queued for when it toggles off
         tool = self._tool_combo.currentData()
         if tool:
+            self._viewer.set_tool(tool)
+
+    def _on_eraser_toggled(self, checked: bool) -> None:
+        if checked:
+            self._viewer.set_tool(SliceViewer.TOOL_ERASER)
+            self._tool_combo.setEnabled(False)
+        else:
+            self._tool_combo.setEnabled(True)
+            tool = self._tool_combo.currentData() or SliceViewer.TOOL_FLOOD
             self._viewer.set_tool(tool)
 
     def _on_artery_changed(self, action: QAction) -> None:

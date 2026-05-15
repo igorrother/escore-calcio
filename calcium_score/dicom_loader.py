@@ -114,6 +114,8 @@ def _series_meta_from_ds(ds, study_uid: str, series_uid: str) -> dict:
         or -1024.0,
         "patient_name": str(_safe_get(ds, "PatientName", "") or ""),
         "patient_id": str(_safe_get(ds, "PatientID", "") or ""),
+        "patient_age": str(_safe_get(ds, "PatientAge", "") or ""),
+        "patient_sex": str(_safe_get(ds, "PatientSex", "") or ""),
         "study_date": str(_safe_get(ds, "StudyDate", "") or ""),
     }
 
@@ -164,6 +166,8 @@ def load_input(path: str | Path) -> list[Study]:
                 study_instance_uid=meta["study_instance_uid"],
                 patient_name=meta["patient_name"],
                 patient_id=meta["patient_id"],
+                patient_age=meta["patient_age"],
+                patient_sex=meta["patient_sex"],
                 study_date=meta["study_date"],
             ),
         )

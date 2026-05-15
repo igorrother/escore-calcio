@@ -33,6 +33,8 @@ class Series:
     # Patient/study info convenient to have on the series
     patient_name: str
     patient_id: str
+    patient_age: str
+    patient_sex: str
     study_date: str
     # File paths sorted by z-position (ImagePositionPatient[2]) ascending
     file_paths: list[Path] = field(default_factory=list)
@@ -86,6 +88,8 @@ class Study:
     study_instance_uid: str
     patient_name: str
     patient_id: str
+    patient_age: str
+    patient_sex: str
     study_date: str
     series: list[Series] = field(default_factory=list)
 
