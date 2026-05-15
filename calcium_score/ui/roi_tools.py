@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtCore import QRect, Qt
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap
 
 # Per-artery overlay colors. Alpha keeps the underlying CT visible through
 # the overlay; the same RGB is reused at full opacity for the toolbar icons.
@@ -28,17 +28,28 @@ def artery_color(artery: str) -> QColor:
     return ARTERY_COLORS.get(artery, QColor(255, 255, 255, 140))
 
 
-def artery_icon(artery: str, size: int = 24) -> QIcon:
-    """Solid colored circle icon for the toolbar artery picker."""
+def artery_icon(artery: str, size: int = 32) -> QIcon:
+    """Solid colored circle icon labeled with the artery abbreviation."""
     pix = QPixmap(size, size)
     pix.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pix)
     try:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         r, g, b = ARTERY_RGB.get(artery, (255, 255, 255))
         painter.setBrush(QColor(r, g, b))
         painter.setPen(QPen(QColor(20, 20, 20), 1))
         painter.drawEllipse(2, 2, size - 4, size - 4)
+
+        # Pick black or white text based on relative luminance.
+        luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        text_color = QColor(0, 0, 0) if luminance > 140 else QColor(255, 255, 255)
+        font = QFont(painter.font())
+        font.setBold(True)
+        font.setPixelSize(max(8, size * 9 // 32))
+        painter.setFont(font)
+        painter.setPen(text_color)
+        painter.drawText(QRect(0, 0, size, size), Qt.AlignmentFlag.AlignCenter, artery)
     finally:
         painter.end()
     return QIcon(pix)

@@ -74,6 +74,7 @@ class SliceViewer(QGraphicsView):
 
     TOOL_FLOOD = "flood"
     TOOL_POLYGON = "polygon"
+    TOOL_ERASER = "eraser"
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -125,7 +126,7 @@ class SliceViewer(QGraphicsView):
         self.slice_changed.emit(self.state.current_index)
 
     def set_tool(self, tool: str) -> None:
-        if tool not in (self.TOOL_FLOOD, self.TOOL_POLYGON):
+        if tool not in (self.TOOL_FLOOD, self.TOOL_POLYGON, self.TOOL_ERASER):
             return
         self.active_tool = tool
         self._cancel_polygon_preview()
@@ -207,6 +208,23 @@ class SliceViewer(QGraphicsView):
             if 0 <= y < les.mask.shape[0] and 0 <= x < les.mask.shape[1] and les.mask[y, x]:
                 return les
         return None
+
+    def _erase_at(self, y: int, x: int) -> None:
+        """Remove the ROI containing pixel (y, x) on the current slice, if any."""
+        if not self.state:
+            return
+        idx = self.state.current_index
+        hit = self._lesion_at(idx, y, x)
+        if hit is None:
+            self.status_message.emit("Click on an ROI to erase it.")
+            return
+        arr = self._lesions_by_slice.get(idx, [])
+        arr.remove(hit)
+        if not arr:
+            del self._lesions_by_slice[idx]
+        self._render_slice()
+        self.lesions_changed.emit()
+        self.status_message.emit(f"Erased {hit.artery} ROI.")
 
     def _draw_candidate_overlay(self, hu_slice: np.ndarray) -> None:
         """Tint pixels >=130 HU that are not yet part of any ROI on this slice."""
@@ -328,6 +346,10 @@ class SliceViewer(QGraphicsView):
             y = int(scene_pos.y())
             hu_slice = self.state.hu_volume[self.state.current_index]
             if not (0 <= x < hu_slice.shape[1] and 0 <= y < hu_slice.shape[0]):
+                return
+
+            if self.active_tool == self.TOOL_ERASER:
+                self._erase_at(y, x)
                 return
 
             if self.active_tool == self.TOOL_FLOOD:

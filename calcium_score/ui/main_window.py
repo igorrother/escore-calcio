@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import (
     QAction,
     QActionGroup,
@@ -103,12 +103,14 @@ class MainWindow(QMainWindow):
         toolbar.setMovable(False)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
+        toolbar.setIconSize(QSize(32, 32))
+
         toolbar.addWidget(QLabel(" Artery: "))
         self._artery_actions: dict[str, QAction] = {}
         self._artery_group = QActionGroup(self)
         self._artery_group.setExclusive(True)
         for artery in ARTERIES:
-            act = QAction(artery_icon(artery, size=28), artery, self)
+            act = QAction(artery_icon(artery, size=32), artery, self)
             act.setCheckable(True)
             act.setToolTip(f"Score as {artery}")
             act.setData(artery)
@@ -116,13 +118,13 @@ class MainWindow(QMainWindow):
             toolbar.addAction(act)
             self._artery_actions[artery] = act
         self._artery_actions["LAD"].setChecked(True)
-        toolbar.setIconSize(toolbar.iconSize().expandedTo(toolbar.iconSize() * 1.2))
 
         toolbar.addSeparator()
         toolbar.addWidget(QLabel(" Tool: "))
         self._tool_combo = QComboBox()
         self._tool_combo.addItem("Flood-fill (click)", userData=SliceViewer.TOOL_FLOOD)
         self._tool_combo.addItem("Free-hand (click and drag to draw)", userData=SliceViewer.TOOL_POLYGON)
+        self._tool_combo.addItem("Eraser (click an ROI to remove it)", userData=SliceViewer.TOOL_ERASER)
         toolbar.addWidget(self._tool_combo)
 
         toolbar.addSeparator()
