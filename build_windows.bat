@@ -23,7 +23,19 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM Remove the intermediate build/ folder. It contains a same-named exe that
+REM looks tempting but is just the bootloader stub — launching it triggers
+REM "Failed to load Python DLL '...build\score_app\_internal\python312.dll'"
+REM because the runtime is in dist\, not build\.
+if exist build rmdir /s /q build
+
 echo.
-echo Build complete: dist\EscoreCalcio\EscoreCalcio.exe
-echo Distribute the entire dist\EscoreCalcio folder (it contains the exe plus DLLs).
+echo ==============================================================
+echo Build complete. The application is here:
+echo.
+echo     %CD%\dist\EscoreCalcio\EscoreCalcio.exe
+echo.
+echo Distribute the entire "dist\EscoreCalcio" folder — the exe needs
+echo the _internal subfolder next to it.
+echo ==============================================================
 endlocal
