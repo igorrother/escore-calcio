@@ -35,7 +35,7 @@ from ..dicom_loader import load_input, load_pixel_volume
 from ..scoring import ARTERIES, Lesion
 from ..series_model import Series, Study
 from .disclaimer import AboutDialog
-from .roi_tools import artery_icon, eraser_icon
+from .roi_tools import artery_icon, eraser_icon, eye_open_icon
 from .score_table import ScoreTable
 from .series_picker import SeriesPickerDialog
 from .viewer import SliceIndexLabel, SliceViewer
@@ -136,6 +136,27 @@ class MainWindow(QMainWindow):
         toolbar.addAction(self._eraser_action)
 
         toolbar.addSeparator()
+        self._show_all_action = QAction(eye_open_icon(32), "Mostrar overlays", self)
+        self._show_all_action.setCheckable(True)
+        self._show_all_action.setChecked(True)
+        self._show_all_action.setToolTip(
+            "Mostrar/ocultar todos os overlays (marcação candidata + ROIs). "
+            "Se desligado, marcar um novo ROI religa o overlay automaticamente."
+        )
+        self._show_all_action.toggled.connect(self._on_show_all_toggled)
+        toolbar.addAction(self._show_all_action)
+
+        self._show_candidate_action = QAction(eye_open_icon(32), "Mostrar marcação candidata", self)
+        self._show_candidate_action.setCheckable(True)
+        self._show_candidate_action.setChecked(True)
+        self._show_candidate_action.setToolTip(
+            "Mostrar/ocultar a marcação rosa das calcificações ≥130 HU "
+            "ainda não pontuadas."
+        )
+        self._show_candidate_action.toggled.connect(self._on_show_candidate_toggled)
+        toolbar.addAction(self._show_candidate_action)
+
+        toolbar.addSeparator()
         self._undo_btn = QPushButton("Desfazer último ROI (este corte)")
         self._undo_btn.clicked.connect(self._undo_last)
         toolbar.addWidget(self._undo_btn)
@@ -167,6 +188,7 @@ class MainWindow(QMainWindow):
         self._viewer.slice_changed.connect(self._on_slice_changed)
         self._viewer.cursor_hu_changed.connect(self._on_cursor_hu)
         self._viewer.status_message.connect(self._on_status_message)
+        self._viewer.overlay_visibility_changed.connect(self._on_overlay_visibility_changed)
 
     def _build_status_bar(self) -> None:
         bar = QStatusBar(self)
@@ -181,6 +203,8 @@ class MainWindow(QMainWindow):
             act.setEnabled(enabled)
         self._tool_combo.setEnabled(enabled and not self._eraser_action.isChecked())
         self._eraser_action.setEnabled(enabled)
+        self._show_all_action.setEnabled(enabled)
+        self._show_candidate_action.setEnabled(enabled)
         self._undo_btn.setEnabled(enabled)
         self._clear_btn.setEnabled(enabled)
 
@@ -282,6 +306,29 @@ class MainWindow(QMainWindow):
         tool = self._tool_combo.currentData()
         if tool:
             self._viewer.set_tool(tool)
+
+    def _on_show_all_toggled(self, checked: bool) -> None:
+        # "All overlays" toggle drives both viewer flags. The candidate
+        # sub-toggle is moot while "all" is off — re-apply its checked
+        # state when "all" comes back on.
+        self._viewer.set_lesion_overlays_visible(checked)
+        self._viewer.set_candidate_overlay_visible(
+            checked and self._show_candidate_action.isChecked()
+        )
+
+    def _on_show_candidate_toggled(self, checked: bool) -> None:
+        # Only meaningful while "all overlays" is on.
+        if self._show_all_action.isChecked():
+            self._viewer.set_candidate_overlay_visible(checked)
+
+    def _on_overlay_visibility_changed(self) -> None:
+        # Viewer auto-restored the lesion overlay after a score in the
+        # "all hidden" state. Sync the toolbar toggle's visual state.
+        self._show_all_action.blockSignals(True)
+        self._show_all_action.setChecked(True)
+        self._show_all_action.blockSignals(False)
+        # Respect the user's candidate-toggle intent: don't override it.
+        self._viewer.set_candidate_overlay_visible(self._show_candidate_action.isChecked())
 
     def _on_eraser_toggled(self, checked: bool) -> None:
         if checked:

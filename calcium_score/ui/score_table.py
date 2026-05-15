@@ -34,6 +34,10 @@ RACE_OPTIONS: list[tuple[str, str]] = [
     ("Chinesa", "chinese"),
 ]
 
+# Default selection: "Branca" is the most-cited MESA reference cohort in
+# Brazilian clinical practice. User can change freely from the combo.
+DEFAULT_RACE_INDEX: int = next(i for i, (_, c) in enumerate(RACE_OPTIONS) if c == "white")
+
 _BUCKET_COLORS = {
     "<25": QColor(120, 200, 120),       # verde
     "25-50": QColor(170, 210, 130),     # verde-amarelado
@@ -166,24 +170,33 @@ class ScoreTable(QWidget):
         self._risk_lbl.setMinimumHeight(30)
         root.addWidget(self._risk_lbl)
 
-        # MESA percentile section
+        # MESA percentile section — wrapped in a container so we can hide
+        # the whole block when the total score is 0 (then it adds no info).
+        self._mesa_block = QWidget()
+        mesa_layout = QVBoxLayout(self._mesa_block)
+        mesa_layout.setContentsMargins(0, 0, 0, 0)
+
         sep3 = QFrame()
         sep3.setFrameShape(QFrame.Shape.HLine)
         sep3.setFrameShadow(QFrame.Shadow.Sunken)
-        root.addWidget(sep3)
+        mesa_layout.addWidget(sep3)
 
         mesa_title = QLabel("Percentil MESA")
         mesa_title.setFont(bold)
-        root.addWidget(mesa_title)
+        mesa_layout.addWidget(mesa_title)
 
         race_row = QHBoxLayout()
         race_row.addWidget(QLabel("Raça/Etnia:"))
         self._race_combo = QComboBox()
         for label, _code in RACE_OPTIONS:
             self._race_combo.addItem(label)
+        # Default to Branca BEFORE wiring the change signal so we don't
+        # trigger an early _refresh while the rest of the widget tree is
+        # still being constructed.
+        self._race_combo.setCurrentIndex(DEFAULT_RACE_INDEX)
         self._race_combo.currentIndexChanged.connect(lambda _i: self._refresh())
         race_row.addWidget(self._race_combo, stretch=1)
-        root.addLayout(race_row)
+        mesa_layout.addLayout(race_row)
 
         self._percentile_lbl = QLabel("—")
         self._percentile_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -195,9 +208,13 @@ class ScoreTable(QWidget):
         self._percentile_lbl.setMinimumHeight(30)
         self._percentile_lbl.setToolTip(
             "Faixa de percentil MESA (McClelland 2006) para a idade, sexo "
-            "e raça/etnia. Requer idade entre 45 e 84 anos."
+            "e raça/etnia. Idades fora de 45-84 são arredondadas ao "
+            "endpoint mais próximo."
         )
-        root.addWidget(self._percentile_lbl)
+        mesa_layout.addWidget(self._percentile_lbl)
+
+        self._mesa_block.setVisible(False)  # only shown once total > 0
+        root.addWidget(self._mesa_block)
 
         root.addStretch(1)
 
@@ -264,7 +281,12 @@ class ScoreTable(QWidget):
         pal.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
         self._risk_lbl.setPalette(pal)
 
-        self._refresh_percentile(total)
+        # When the total is 0 the percentile is always "<25" — that adds
+        # no information. Hide the entire MESA block instead.
+        show_mesa = total > 0
+        self._mesa_block.setVisible(show_mesa)
+        if show_mesa:
+            self._refresh_percentile(total)
 
     def _refresh_percentile(self, total: float) -> None:
         race_code = RACE_OPTIONS[self._race_combo.currentIndex()][1]

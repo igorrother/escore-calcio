@@ -77,6 +77,10 @@ class SliceViewer(QGraphicsView):
     slice_changed = Signal(int)
     cursor_hu_changed = Signal(int, int, float)
     status_message = Signal(str)
+    # Fired when the viewer auto-restores lesion-overlay visibility because
+    # the user scored a new ROI while overlays were hidden — main_window
+    # listens so it can sync the toolbar toggle's checked state.
+    overlay_visibility_changed = Signal()
 
     TOOL_FLOOD = "flood"
     TOOL_POLYGON = "polygon"
@@ -114,6 +118,12 @@ class SliceViewer(QGraphicsView):
         self._preview_path: QPainterPath | None = None
         self._preview_item: QGraphicsPathItem | None = None
 
+        # Overlay visibility (both default to ON). Click-to-score still
+        # works when overlays are hidden because mouse handlers read
+        # hu_volume, not the overlay pixmaps.
+        self._show_lesion_overlays: bool = True
+        self._show_candidate_overlay: bool = True
+
         # Right-button window/level drag
         self._wl_start: QPoint | None = None
         self._wl_initial: tuple[float, float] | None = None
@@ -139,6 +149,20 @@ class SliceViewer(QGraphicsView):
 
     def set_artery(self, artery: str) -> None:
         self.active_artery = artery
+
+    def set_lesion_overlays_visible(self, visible: bool) -> None:
+        if self._show_lesion_overlays == visible:
+            return
+        self._show_lesion_overlays = visible
+        if self.state:
+            self._render_slice()
+
+    def set_candidate_overlay_visible(self, visible: bool) -> None:
+        if self._show_candidate_overlay == visible:
+            return
+        self._show_candidate_overlay = visible
+        if self.state:
+            self._render_slice()
 
     def set_slice(self, index: int) -> None:
         if not self.state:
@@ -186,11 +210,13 @@ class SliceViewer(QGraphicsView):
 
         # Draw a translucent tint over candidate calcium that hasn't been
         # scored yet, so the user can see where to click.
-        self._draw_candidate_overlay(hu_slice)
+        if self._show_candidate_overlay:
+            self._draw_candidate_overlay(hu_slice)
 
         # Draw overlays for lesions on this slice
-        for les in self._lesions_by_slice.get(self.state.current_index, []):
-            self._draw_lesion_overlay(les)
+        if self._show_lesion_overlays:
+            for les in self._lesions_by_slice.get(self.state.current_index, []):
+                self._draw_lesion_overlay(les)
 
         # Free-hand polygon preview is managed separately as a persistent
         # QGraphicsPathItem (see _start/_extend/_cancel_polygon_preview)
@@ -485,9 +511,19 @@ class SliceViewer(QGraphicsView):
         self._add_lesion(les)
 
     def _add_lesion(self, les: Lesion) -> None:
+        # If the user is scoring while the lesion overlay is hidden,
+        # auto-restore it — they almost certainly want to see what they
+        # just drew. Candidate overlay visibility is NOT auto-restored:
+        # if the user explicitly turned it off, scoring respects that.
+        auto_restored = False
+        if not self._show_lesion_overlays:
+            self._show_lesion_overlays = True
+            auto_restored = True
         self._lesions_by_slice.setdefault(les.slice_index, []).append(les)
         self._render_slice()
         self.lesion_added.emit(les)
+        if auto_restored:
+            self.overlay_visibility_changed.emit()
 
 
 class SliceIndexLabel(QLabel):

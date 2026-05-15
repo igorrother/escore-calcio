@@ -29,6 +29,77 @@ def artery_color(artery: str) -> QColor:
     return ARTERY_COLORS.get(artery, QColor(255, 255, 255, 140))
 
 
+def eye_open_icon(size: int = 32) -> QIcon:
+    """A simple monochrome 'eye open' icon for overlay-visibility toggles."""
+    pix = QPixmap(size, size)
+    pix.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pix)
+    try:
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # Almond-shaped outline approximated with an ellipse.
+        pen = QPen(QColor(230, 230, 230), 1.6)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        almond_w = size * 0.78
+        almond_h = size * 0.42
+        painter.drawEllipse(
+            (size - almond_w) / 2,
+            (size - almond_h) / 2,
+            almond_w,
+            almond_h,
+        )
+        # Iris + pupil.
+        painter.setBrush(QColor(80, 140, 220))
+        painter.setPen(QPen(QColor(40, 80, 140), 1.0))
+        iris = size * 0.28
+        painter.drawEllipse(
+            (size - iris) / 2,
+            (size - iris) / 2,
+            iris,
+            iris,
+        )
+        painter.setBrush(QColor(20, 20, 20))
+        painter.setPen(Qt.PenStyle.NoPen)
+        pupil = size * 0.12
+        painter.drawEllipse(
+            (size - pupil) / 2,
+            (size - pupil) / 2,
+            pupil,
+            pupil,
+        )
+    finally:
+        painter.end()
+    return QIcon(pix)
+
+
+def eye_closed_icon(size: int = 32) -> QIcon:
+    """A simple monochrome 'eye closed' icon (closed eyelid + lashes)."""
+    pix = QPixmap(size, size)
+    pix.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pix)
+    try:
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pen = QPen(QColor(220, 220, 220), 1.8)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        # Closed-eyelid curve (a shallow arc).
+        margin = size * 0.12
+        rect_x = margin
+        rect_y = size * 0.30
+        rect_w = size - 2 * margin
+        rect_h = size * 0.40
+        painter.drawArc(int(rect_x), int(rect_y), int(rect_w), int(rect_h), 0 * 16, 180 * 16)
+        # Three short eyelashes hanging down from the arc.
+        cy = rect_y + rect_h / 2
+        for dx, dy in [(-0.30, 0.18), (0.0, 0.22), (0.30, 0.18)]:
+            x0 = size / 2 + dx * size
+            y0 = cy + 2
+            painter.drawLine(int(x0), int(y0), int(x0 + dy * size * 0.4), int(y0 + dy * size * 1.0))
+    finally:
+        painter.end()
+    return QIcon(pix)
+
+
 def eraser_icon(size: int = 32) -> QIcon:
     """A small pink-block eraser icon for the toolbar."""
     pix = QPixmap(size, size)

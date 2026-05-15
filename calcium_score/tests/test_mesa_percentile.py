@@ -74,11 +74,23 @@ class TestPercentileThresholdsInterpolation:
     def test_clamps_above_80(self):
         assert percentile_thresholds(84, "F", "white") == percentile_thresholds(80, "F", "white")
 
-    def test_below_min_returns_none(self):
-        assert percentile_thresholds(40, "M", "white") is None
+    def test_below_min_clamps_to_45(self):
+        # Ages below 45 clamp to 45, which itself clamps to the age-50
+        # endpoint row inside the function.
+        assert percentile_thresholds(40, "M", "white") == percentile_thresholds(50, "M", "white")
+        assert percentile_thresholds(44, "F", "hispanic") == percentile_thresholds(50, "F", "hispanic")
 
-    def test_above_max_returns_none(self):
-        assert percentile_thresholds(90, "M", "white") is None
+    def test_above_max_clamps_to_84(self):
+        # Ages above 84 clamp to 84 -> uses age-80 endpoint row.
+        assert percentile_thresholds(90, "M", "white") == percentile_thresholds(80, "M", "white")
+        assert percentile_thresholds(85, "F", "black") == percentile_thresholds(80, "F", "black")
+
+    def test_age_44_matches_age_45_matches_age_50(self):
+        # All three sub-50 ages collapse to the same endpoint row.
+        a = percentile_thresholds(44, "M", "chinese")
+        b = percentile_thresholds(45, "M", "chinese")
+        c = percentile_thresholds(50, "M", "chinese")
+        assert a == b == c
 
     def test_unknown_race_returns_none(self):
         assert percentile_thresholds(60, "M", "indigenous") is None
@@ -115,8 +127,12 @@ class TestPercentileBucket:
         # White male age 70: p75=540, p90=1345, score 800 -> "75-90"
         assert percentile_bucket(800, 70, "M", "white") == "75-90"
 
-    def test_returns_none_out_of_range(self):
-        assert percentile_bucket(50, 40, "M", "white") is None
+    def test_below_min_age_uses_age_45_row(self):
+        # Age 40 clamps to 45 -> 50 endpoint row. 50yo M white: [0, 0, 22, 110].
+        # Score 50 should land in 75-90 (>22, <=110).
+        assert percentile_bucket(50, 40, "M", "white") == "75-90"
+
+    def test_unknown_demographic_returns_none(self):
         assert percentile_bucket(50, 60, "M", "unknown") is None
 
 

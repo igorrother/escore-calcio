@@ -129,8 +129,10 @@ def percentile_thresholds(age: float, sex: str, race: str) -> list[float] | None
     """
     if race not in MESA_TABLE or sex not in MESA_TABLE[race]:
         return None
-    if age < AGE_MIN or age > AGE_MAX:
-        return None
+    # Clamp ages outside MESA's published 45-84 range to the nearest endpoint.
+    # Patients close to but outside the range still benefit from the closest
+    # available reference rather than getting no percentile at all.
+    age = max(AGE_MIN, min(AGE_MAX, age))
     by_age = MESA_TABLE[race][sex]
     midpoints = sorted(by_age.keys())  # [50, 60, 70, 80]
     if age <= midpoints[0]:
