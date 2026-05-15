@@ -1,4 +1,4 @@
-# CLAUDE.md — score_app (Agatston Calcium Score)
+# CLAUDE.md — escore-calcio (Agatston Calcium Score)
 
 ## Project purpose
 
@@ -31,7 +31,7 @@ python -m pytest
 ## Layout
 
 ```
-score_app/
+escore-calcio/
 ├── CLAUDE.md
 ├── README.md
 ├── requirements.txt

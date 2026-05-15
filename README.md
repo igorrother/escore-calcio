@@ -12,7 +12,7 @@ contrastada em DICOM.
 
 ## Baixar
 
-Acesse a [página de Releases](https://github.com/igorrother/score_app/releases)
+Acesse a [página de Releases](https://github.com/igorrother/escore-calcio/releases)
 e baixe o arquivo correspondente ao seu sistema:
 
 | Sistema operacional | Arquivo |
@@ -149,8 +149,8 @@ automaticamente para Windows + macOS Apple Silicon a cada tag `v*` empurrada.
 ### Setup local
 
 ```bash
-git clone https://github.com/igorrother/score_app
-cd score_app
+git clone https://github.com/igorrother/escore-calcio
+cd escore-calcio
 python -m venv .venv
 
 # Windows
