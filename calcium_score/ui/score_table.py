@@ -122,7 +122,7 @@ class ScoreTable(QWidget):
         self._total_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(self._total_lbl)
 
-        self._risk_lbl = QLabel("Risco: —")
+        self._risk_lbl = QLabel("—")
         self._risk_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._risk_lbl.setAutoFillBackground(True)
         risk_font = QFont()
@@ -187,7 +187,7 @@ class ScoreTable(QWidget):
         total = grand_total(self._lesions)
         self._total_lbl.setText(f"{total:.1f}")
         risk = risk_category(total)
-        self._risk_lbl.setText(f"Risco: {risk}")
+        self._risk_lbl.setText(f"{risk}")
         pal = self._risk_lbl.palette()
         pal.setColor(QPalette.ColorRole.Window, _RISK_COLORS.get(risk, QColor(180, 180, 180)))
         pal.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))

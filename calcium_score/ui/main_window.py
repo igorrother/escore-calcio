@@ -130,17 +130,17 @@ class MainWindow(QMainWindow):
         self._eraser_action = QAction(eraser_icon(32), "Borracha", self)
         self._eraser_action.setCheckable(True)
         self._eraser_action.setToolTip(
-            "Borracha — clique em uma ROI para removê-la. Desligue para voltar a marcar."
+            "Borracha — clique em um ROI para removê-la. Desligue para voltar a marcar."
         )
         self._eraser_action.toggled.connect(self._on_eraser_toggled)
         toolbar.addAction(self._eraser_action)
 
         toolbar.addSeparator()
-        self._undo_btn = QPushButton("Desfazer última ROI (esta fatia)")
+        self._undo_btn = QPushButton("Desfazer último ROI (este corte)")
         self._undo_btn.clicked.connect(self._undo_last)
         toolbar.addWidget(self._undo_btn)
 
-        self._clear_btn = QPushButton("Limpar todas as ROIs")
+        self._clear_btn = QPushButton("Limpar todos ROIs")
         self._clear_btn.clicked.connect(self._clear_all)
         toolbar.addWidget(self._clear_btn)
 

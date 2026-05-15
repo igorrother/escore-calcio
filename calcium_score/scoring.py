@@ -77,7 +77,7 @@ def risk_category(total: float) -> str:
         return "leve"
     if total <= 400:
         return "moderado"
-    return "grave"
+    return "Acentuado"
 
 
 def _score_mask(
