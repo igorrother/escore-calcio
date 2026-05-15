@@ -21,7 +21,7 @@ python main.py
 ## Workflow
 
 1. Accept the research-use-only disclaimer at startup.
-2. `File → Open Folder…` or `File → Open ZIP…` and choose your DICOM dataset.
+2. `File → Open Folder…` or `File → Open ZIP…`, **or just drag a folder/ZIP onto the window**.
 3. Pick the calcium-scoring CT series (candidates are auto-flagged).
 4. Scroll through slices, pick an artery (LM / LAD / LCx / RCA / PDA), pick a tool:
    - **Flood-fill** — click on a calcification; the app grows a region of all touching pixels ≥ 130 HU.

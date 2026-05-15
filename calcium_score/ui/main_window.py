@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QPalette, QColor
+from PySide6.QtGui import QAction, QDragEnterEvent, QDragMoveEvent, QDropEvent, QPalette, QColor
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -47,6 +47,7 @@ class MainWindow(QMainWindow):
         self._build_status_bar()
 
         self._set_tools_enabled(False)
+        self.setAcceptDrops(True)
 
     # ---------- UI scaffold ----------
     def _build_menu(self) -> None:
@@ -283,3 +284,41 @@ class MainWindow(QMainWindow):
 
     def _show_about(self) -> None:
         AboutDialog(self).exec()
+
+    # ---------- drag and drop ----------
+    @staticmethod
+    def _droppable_path_from_urls(urls) -> Path | None:
+        """Return the first acceptable folder or .zip path from a list of QUrls."""
+        for url in urls:
+            if not url.isLocalFile():
+                continue
+            p = Path(url.toLocalFile())
+            if p.is_dir() or (p.is_file() and p.suffix.lower() == ".zip"):
+                return p
+        return None
+
+    def _droppable_path(self, event) -> Path | None:
+        mime = event.mimeData()
+        if mime is None or not mime.hasUrls():
+            return None
+        return self._droppable_path_from_urls(mime.urls())
+
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        if self._droppable_path(event) is not None:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event: QDragMoveEvent) -> None:
+        if self._droppable_path(event) is not None:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        path = self._droppable_path(event)
+        if path is None:
+            event.ignore()
+            return
+        event.acceptProposedAction()
+        self._load(path)
