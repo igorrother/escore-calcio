@@ -68,16 +68,26 @@ def lesion_score(area_mm2: float, max_hu: float) -> float:
 
 
 def risk_category(total: float) -> str:
-    """Standard Agatston risk classification for total CAC score (pt-BR)."""
+    """Agatston CAC ranking (pt-BR), 6 buckets.
+
+    0           -> ausente
+    >0  <10     -> mínimo
+    >=10  <100  -> discreto
+    >=100 <400  -> moderado
+    >=400 <1000 -> acentuado
+    >=1000      -> muito acentuado
+    """
     if total <= 0:
-        return "nenhum"
-    if total <= 10:
+        return "ausente"
+    if total < 10:
         return "mínimo"
-    if total <= 100:
-        return "leve"
-    if total <= 400:
+    if total < 100:
+        return "discreto"
+    if total < 400:
         return "moderado"
-    return "Acentuado"
+    if total < 1000:
+        return "acentuado"
+    return "muito acentuado"
 
 
 def _score_mask(

@@ -42,11 +42,12 @@ def _format_dicom_age(age: str) -> str:
 
 
 _RISK_COLORS = {
-    "nenhum": QColor(120, 200, 120),
-    "mínimo": QColor(120, 170, 220),
-    "leve": QColor(230, 220, 100),
-    "moderado": QColor(230, 160, 80),
-    "grave": QColor(220, 80, 80),
+    "ausente": QColor(120, 200, 120),         # verde
+    "mínimo": QColor(140, 200, 220),          # azul claro
+    "discreto": QColor(230, 220, 100),        # amarelo
+    "moderado": QColor(230, 160, 80),         # laranja
+    "acentuado": QColor(220, 80, 80),         # vermelho
+    "muito acentuado": QColor(150, 30, 30),   # vermelho escuro
 }
 
 

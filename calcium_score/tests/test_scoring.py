@@ -73,15 +73,17 @@ class TestRiskCategory:
     @pytest.mark.parametrize(
         "total,expected",
         [
-            (0, "nenhum"),
-            (1, "mínimo"),
-            (10, "mínimo"),
-            (11, "leve"),
-            (100, "leve"),
-            (101, "moderado"),
-            (400, "moderado"),
-            (401, "grave"),
-            (1500, "grave"),
+            (0, "ausente"),
+            (0.1, "mínimo"),
+            (9.99, "mínimo"),
+            (10, "discreto"),
+            (99, "discreto"),
+            (100, "moderado"),
+            (399, "moderado"),
+            (400, "acentuado"),
+            (999, "acentuado"),
+            (1000, "muito acentuado"),
+            (5000, "muito acentuado"),
         ],
     )
     def test_buckets(self, total, expected):
