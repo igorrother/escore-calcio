@@ -3,5 +3,13 @@ pydicom>=2.4
 numpy>=1.26
 scikit-image>=0.22
 pytest>=7.4
+# pydicom decompression plugins. pydicom itself only reads uncompressed
+# transfer syntaxes; PACS-exported CTs are typically JPEG Lossless
+# Process 14 or JPEG 2000. pylibjpeg is pure-Python wheels (PyInstaller-
+# friendly, unlike GDCM).
+pylibjpeg>=2.0
+pylibjpeg-libjpeg>=2.1     # JPEG baseline + JPEG Lossless (Process 14)
+pylibjpeg-openjpeg>=2.0    # JPEG 2000 (lossless and lossy)
+pylibjpeg-rle>=2.0         # RLE Lossless
 # Build-only: bundle the app into a Windows .exe via build_windows.bat
 pyinstaller>=6.0

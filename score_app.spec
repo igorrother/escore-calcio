@@ -4,15 +4,29 @@
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 # pydicom and scikit-image lazily import transfer-syntax codecs and submodules
-# that PyInstaller's static analysis misses; collect them explicitly.
+# that PyInstaller's static analysis misses; collect them explicitly. The
+# pylibjpeg family is also import-by-name, so each plugin needs collection
+# or PACS-exported CTs (typically JPEG Lossless Process 14 or JPEG 2000)
+# will fail to decompress inside the bundled exe.
 hiddenimports = (
     collect_submodules("pydicom")
     + collect_submodules("pydicom.encoders")
     + collect_submodules("pydicom.pixel_data_handlers")
+    + collect_submodules("pydicom.pixels")
     + collect_submodules("skimage")
+    + collect_submodules("pylibjpeg")
+    + collect_submodules("libjpeg")          # pylibjpeg-libjpeg
+    + collect_submodules("openjpeg")         # pylibjpeg-openjpeg
+    + collect_submodules("rle")              # pylibjpeg-rle
 )
 
-datas = collect_data_files("skimage")
+datas = (
+    collect_data_files("skimage")
+    + collect_data_files("pylibjpeg")
+    + collect_data_files("libjpeg")
+    + collect_data_files("openjpeg")
+    + collect_data_files("rle")
+)
 
 a = Analysis(
     ["main.py"],
