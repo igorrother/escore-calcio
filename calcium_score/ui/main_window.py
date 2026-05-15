@@ -46,7 +46,7 @@ log = logging.getLogger(__name__)
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Agatston Calcium Score — research tool")
+        self.setWindowTitle("Escore de Cálcio de Agatston — ferramenta de pesquisa")
         self.resize(1400, 900)
 
         self._current_series: Series | None = None
@@ -61,26 +61,26 @@ class MainWindow(QMainWindow):
     # ---------- UI scaffold ----------
     def _build_menu(self) -> None:
         menubar = self.menuBar()
-        file_menu = menubar.addMenu("&File")
+        file_menu = menubar.addMenu("&Arquivo")
 
-        open_folder = QAction("Open &Folder…", self)
+        open_folder = QAction("Abrir &Pasta…", self)
         open_folder.setShortcut("Ctrl+O")
         open_folder.triggered.connect(self._open_folder)
         file_menu.addAction(open_folder)
 
-        open_zip = QAction("Open &ZIP…", self)
+        open_zip = QAction("Abrir &ZIP…", self)
         open_zip.setShortcut("Ctrl+Shift+O")
         open_zip.triggered.connect(self._open_zip)
         file_menu.addAction(open_zip)
 
         file_menu.addSeparator()
-        quit_action = QAction("&Quit", self)
+        quit_action = QAction("&Sair", self)
         quit_action.setShortcut("Ctrl+Q")
         quit_action.triggered.connect(self.close)
         file_menu.addAction(quit_action)
 
-        help_menu = menubar.addMenu("&Help")
-        about = QAction("&About", self)
+        help_menu = menubar.addMenu("Aj&uda")
+        about = QAction("&Sobre", self)
         about.triggered.connect(self._show_about)
         help_menu.addAction(about)
 
@@ -99,48 +99,48 @@ class MainWindow(QMainWindow):
         outer.addWidget(self._warning_lbl)
 
         # Toolbar for tool/artery selection
-        toolbar = QToolBar("Scoring tools")
+        toolbar = QToolBar("Ferramentas de marcação")
         toolbar.setMovable(False)
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         toolbar.setIconSize(QSize(32, 32))
 
-        toolbar.addWidget(QLabel(" Artery: "))
+        toolbar.addWidget(QLabel(" Artéria: "))
         self._artery_actions: dict[str, QAction] = {}
         self._artery_group = QActionGroup(self)
         self._artery_group.setExclusive(True)
         for artery in ARTERIES:
             act = QAction(artery_icon(artery, size=32), artery, self)
             act.setCheckable(True)
-            act.setToolTip(f"Score as {artery}")
+            act.setToolTip(f"Marcar como {artery}")
             act.setData(artery)
             self._artery_group.addAction(act)
             toolbar.addAction(act)
             self._artery_actions[artery] = act
-        self._artery_actions["LAD"].setChecked(True)
+        self._artery_actions["DA"].setChecked(True)
 
         toolbar.addSeparator()
-        toolbar.addWidget(QLabel(" Tool: "))
+        toolbar.addWidget(QLabel(" Ferramenta: "))
         self._tool_combo = QComboBox()
-        self._tool_combo.addItem("Flood-fill (click)", userData=SliceViewer.TOOL_FLOOD)
-        self._tool_combo.addItem("Free-hand (click and drag to draw)", userData=SliceViewer.TOOL_POLYGON)
+        self._tool_combo.addItem("Preenchimento (clique)", userData=SliceViewer.TOOL_FLOOD)
+        self._tool_combo.addItem("Mão livre (clique e arraste)", userData=SliceViewer.TOOL_POLYGON)
         toolbar.addWidget(self._tool_combo)
 
         toolbar.addSeparator()
-        self._eraser_action = QAction(eraser_icon(32), "Eraser", self)
+        self._eraser_action = QAction(eraser_icon(32), "Borracha", self)
         self._eraser_action.setCheckable(True)
         self._eraser_action.setToolTip(
-            "Eraser — click an ROI to remove it. Toggle off to return to drawing."
+            "Borracha — clique em uma ROI para removê-la. Desligue para voltar a marcar."
         )
         self._eraser_action.toggled.connect(self._on_eraser_toggled)
         toolbar.addAction(self._eraser_action)
 
         toolbar.addSeparator()
-        self._undo_btn = QPushButton("Undo last ROI (this slice)")
+        self._undo_btn = QPushButton("Desfazer última ROI (esta fatia)")
         self._undo_btn.clicked.connect(self._undo_last)
         toolbar.addWidget(self._undo_btn)
 
-        self._clear_btn = QPushButton("Clear all ROIs")
+        self._clear_btn = QPushButton("Limpar todas as ROIs")
         self._clear_btn.clicked.connect(self._clear_all)
         toolbar.addWidget(self._clear_btn)
 
@@ -173,7 +173,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(bar)
         self._slice_lbl = SliceIndexLabel()
         bar.addPermanentWidget(self._slice_lbl)
-        self._hu_lbl = QLabel("HU: —")
+        self._hu_lbl = QLabel("UH: —")
         bar.addWidget(self._hu_lbl)
 
     def _set_tools_enabled(self, enabled: bool) -> None:
@@ -186,26 +186,26 @@ class MainWindow(QMainWindow):
 
     def _current_artery(self) -> str:
         checked = self._artery_group.checkedAction()
-        return checked.data() if checked is not None else "LAD"
+        return checked.data() if checked is not None else "DA"
 
     # ---------- actions ----------
     def _open_folder(self) -> None:
-        path = QFileDialog.getExistingDirectory(self, "Open DICOM folder")
+        path = QFileDialog.getExistingDirectory(self, "Abrir pasta DICOM")
         if not path:
             return
         self._load(Path(path))
 
     def _open_zip(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open DICOM ZIP", "", "ZIP archives (*.zip);;All files (*)"
+            self, "Abrir ZIP DICOM", "", "Arquivos ZIP (*.zip);;Todos os arquivos (*)"
         )
         if not path:
             return
         self._load(Path(path))
 
     def _load(self, path: Path) -> None:
-        progress = QProgressDialog("Reading DICOM headers…", None, 0, 0, self)
-        progress.setWindowTitle("Loading")
+        progress = QProgressDialog("Lendo cabeçalhos DICOM…", None, 0, 0, self)
+        progress.setWindowTitle("Carregando")
         progress.setWindowModality(Qt.WindowModality.ApplicationModal)
         progress.setMinimumDuration(300)
         progress.setCancelButton(None)
@@ -214,15 +214,15 @@ class MainWindow(QMainWindow):
             studies = load_input(path)
         except Exception as exc:
             progress.close()
-            QMessageBox.critical(self, "Failed to read input", str(exc))
+            QMessageBox.critical(self, "Falha ao ler entrada", str(exc))
             return
         progress.close()
 
         if not studies or all(not st.series for st in studies):
             QMessageBox.warning(
                 self,
-                "No CT series found",
-                "Could not find any CT series in the selected input.",
+                "Nenhuma série de TC encontrada",
+                "Nenhuma série de TC foi encontrada na entrada selecionada.",
             )
             return
 
@@ -238,13 +238,13 @@ class MainWindow(QMainWindow):
         if series.pixel_spacing is None:
             QMessageBox.critical(
                 self,
-                "Cannot open series",
-                "This series has no PixelSpacing tag, so lesion area in mm² cannot be computed.",
+                "Não foi possível abrir a série",
+                "Esta série não tem a tag PixelSpacing, então a área da lesão em mm² não pode ser calculada.",
             )
             return
 
-        progress = QProgressDialog("Loading pixel data…", None, 0, 0, self)
-        progress.setWindowTitle("Loading")
+        progress = QProgressDialog("Carregando dados de pixel…", None, 0, 0, self)
+        progress.setWindowTitle("Carregando")
         progress.setWindowModality(Qt.WindowModality.ApplicationModal)
         progress.setMinimumDuration(0)
         progress.setCancelButton(None)
@@ -253,7 +253,7 @@ class MainWindow(QMainWindow):
             hu_volume = load_pixel_volume(series)
         except Exception as exc:
             progress.close()
-            QMessageBox.critical(self, "Failed to load pixels", str(exc))
+            QMessageBox.critical(self, "Falha ao carregar pixels", str(exc))
             return
         progress.close()
 
@@ -310,7 +310,7 @@ class MainWindow(QMainWindow):
             self._slice_lbl.update_from(idx, total)
 
     def _on_cursor_hu(self, x: int, y: int, hu: float) -> None:
-        self._hu_lbl.setText(f"x={x}, y={y}, HU={hu:.0f}")
+        self._hu_lbl.setText(f"x={x}, y={y}, UH={hu:.0f}")
 
     def _on_status_message(self, text: str) -> None:
         self.statusBar().showMessage(text, 4000)
@@ -326,8 +326,8 @@ class MainWindow(QMainWindow):
             return
         confirm = QMessageBox.question(
             self,
-            "Clear all ROIs",
-            "Remove every ROI you've drawn for this series?",
+            "Limpar todas as ROIs",
+            "Remover todas as ROIs marcadas nesta série?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )

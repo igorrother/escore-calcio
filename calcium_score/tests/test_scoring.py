@@ -73,15 +73,15 @@ class TestRiskCategory:
     @pytest.mark.parametrize(
         "total,expected",
         [
-            (0, "none"),
-            (1, "minimal"),
-            (10, "minimal"),
-            (11, "mild"),
-            (100, "mild"),
-            (101, "moderate"),
-            (400, "moderate"),
-            (401, "severe"),
-            (1500, "severe"),
+            (0, "nenhum"),
+            (1, "mínimo"),
+            (10, "mínimo"),
+            (11, "leve"),
+            (100, "leve"),
+            (101, "moderado"),
+            (400, "moderado"),
+            (401, "grave"),
+            (1500, "grave"),
         ],
     )
     def test_buckets(self, total, expected):
@@ -93,12 +93,12 @@ class TestScoreFloodFill:
         # 1 mm per pixel, 5x5 block at HU=250 -> area 25 mm^2, weight 2, score 50
         hu = np.full((20, 20), -1000, dtype=np.float32)
         hu[5:10, 5:10] = 250
-        les = score_flood_fill(hu, (7, 7), pixel_area_mm2=1.0, artery="LAD", slice_index=3)
+        les = score_flood_fill(hu, (7, 7), pixel_area_mm2=1.0, artery="DA", slice_index=3)
         assert les is not None
         assert les.area_mm2 == 25.0
         assert les.max_hu == 250.0
         assert les.score == 50.0
-        assert les.artery == "LAD"
+        assert les.artery == "DA"
         assert les.slice_index == 3
         assert les.mask.shape == hu.shape
         assert les.mask.sum() == 25
@@ -106,18 +106,18 @@ class TestScoreFloodFill:
     def test_seed_below_threshold_returns_none(self):
         hu = np.full((10, 10), -1000, dtype=np.float32)
         hu[5, 5] = 100  # below threshold
-        assert score_flood_fill(hu, (5, 5), 1.0, artery="LAD", slice_index=0) is None
+        assert score_flood_fill(hu, (5, 5), 1.0, artery="DA", slice_index=0) is None
 
     def test_seed_out_of_bounds(self):
         hu = np.full((10, 10), 200, dtype=np.float32)
-        assert score_flood_fill(hu, (-1, 0), 1.0, artery="LAD", slice_index=0) is None
-        assert score_flood_fill(hu, (10, 0), 1.0, artery="LAD", slice_index=0) is None
+        assert score_flood_fill(hu, (-1, 0), 1.0, artery="DA", slice_index=0) is None
+        assert score_flood_fill(hu, (10, 0), 1.0, artery="DA", slice_index=0) is None
 
     def test_does_not_leak_to_disconnected_region(self):
         hu = np.full((20, 20), -1000, dtype=np.float32)
         hu[2:4, 2:4] = 200  # 2x2 block A
         hu[15:17, 15:17] = 500  # 2x2 block B (disconnected)
-        les = score_flood_fill(hu, (2, 2), 1.0, artery="RCA", slice_index=0)
+        les = score_flood_fill(hu, (2, 2), 1.0, artery="CD", slice_index=0)
         assert les is not None
         # Should only have picked up block A (4 mm^2 at max 200 HU, weight 2)
         assert les.area_mm2 == 4.0
@@ -129,7 +129,7 @@ class TestScoreFloodFill:
         hu = np.full((10, 10), -1000, dtype=np.float32)
         hu[3:6, 3:6] = 200  # 9 pixels at 200 (weight 2 if alone)
         hu[4, 4] = 450  # one pixel at 450 -> raises weight to 4
-        les = score_flood_fill(hu, (4, 4), 1.0, artery="LAD", slice_index=0)
+        les = score_flood_fill(hu, (4, 4), 1.0, artery="DA", slice_index=0)
         assert les is not None
         assert les.area_mm2 == 9.0
         assert les.max_hu == 450.0
@@ -139,7 +139,7 @@ class TestScoreFloodFill:
         # pixel area 0.1 mm^2, 5-pixel blob -> 0.5 mm^2 area (below 1 mm^2 minimum)
         hu = np.full((10, 10), -1000, dtype=np.float32)
         hu[2, 2:7] = 200
-        les = score_flood_fill(hu, (2, 4), 0.1, artery="LAD", slice_index=0)
+        les = score_flood_fill(hu, (2, 4), 0.1, artery="DA", slice_index=0)
         assert les is not None
         assert les.area_mm2 == pytest.approx(0.5)
         assert les.score == 0.0
@@ -151,7 +151,7 @@ class TestScorePolygon:
         hu[5:10, 5:10] = 250  # 5x5 calcified region
         # polygon covers the whole image (almost) -> only the calcified 25 pixels score
         poly = np.array([[1, 1], [18, 1], [18, 18], [1, 18]], dtype=float)
-        les = score_polygon(hu, poly, 1.0, artery="LCx", slice_index=0)
+        les = score_polygon(hu, poly, 1.0, artery="Cx", slice_index=0)
         assert les is not None
         assert les.area_mm2 == 25.0
         assert les.max_hu == 250.0
@@ -159,14 +159,14 @@ class TestScorePolygon:
 
     def test_polygon_with_fewer_than_three_vertices_returns_none(self):
         hu = np.full((10, 10), 300, dtype=np.float32)
-        assert score_polygon(hu, np.array([[1, 1], [2, 2]]), 1.0, artery="LAD", slice_index=0) is None
+        assert score_polygon(hu, np.array([[1, 1], [2, 2]]), 1.0, artery="DA", slice_index=0) is None
 
     def test_polygon_misses_calcium_returns_none(self):
         hu = np.full((20, 20), -1000, dtype=np.float32)
         hu[15:18, 15:18] = 300
         # polygon in opposite corner
         poly = np.array([[1, 1], [4, 1], [4, 4], [1, 4]], dtype=float)
-        assert score_polygon(hu, poly, 1.0, artery="LAD", slice_index=0) is None
+        assert score_polygon(hu, poly, 1.0, artery="DA", slice_index=0) is None
 
 
 class TestAggregation:
@@ -181,12 +181,12 @@ class TestAggregation:
         )
 
     def test_totals_by_artery_includes_zero_arteries(self):
-        lesions = [self._mk_lesion("LAD", 30.0), self._mk_lesion("LAD", 10.0), self._mk_lesion("RCA", 25.0)]
+        lesions = [self._mk_lesion("DA", 30.0), self._mk_lesion("DA", 10.0), self._mk_lesion("CD", 25.0)]
         totals = totals_by_artery(lesions)
-        assert totals == {"LM": 0.0, "LAD": 40.0, "LCx": 0.0, "RCA": 25.0, "PDA": 0.0}
+        assert totals == {"TCE": 0.0, "DA": 40.0, "Cx": 0.0, "CD": 25.0, "DP": 0.0}
 
     def test_grand_total(self):
-        lesions = [self._mk_lesion("LAD", 30.0), self._mk_lesion("RCA", 25.0)]
+        lesions = [self._mk_lesion("DA", 30.0), self._mk_lesion("CD", 25.0)]
         assert grand_total(lesions) == 55.0
 
 

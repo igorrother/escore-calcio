@@ -70,14 +70,20 @@ class Series:
         """Non-blocking warnings shown to the user after they pick this series."""
         out: list[str] = []
         if self.slice_thickness is None:
-            out.append("Slice thickness missing in DICOM header; Agatston totals may be unreliable.")
+            out.append(
+                "Espessura de fatia ausente no cabeçalho DICOM; o escore de "
+                "Agatston pode ser pouco confiável."
+            )
         elif abs(self.slice_thickness - _STANDARD_THICKNESS_MM) >= 0.05:
             out.append(
-                f"Slice thickness {self.slice_thickness:g} mm differs from the standard 3 mm "
-                "Agatston protocol; totals may not be comparable to reference values."
+                f"Espessura de fatia {self.slice_thickness:g} mm difere do "
+                "protocolo padrão de Agatston de 3 mm; os totais podem não ser "
+                "comparáveis aos valores de referência."
             )
         if self.pixel_spacing is None:
-            out.append("Pixel spacing missing; cannot compute lesion area in mm^2.")
+            out.append(
+                "Espaçamento de pixel ausente; não é possível calcular a área da lesão em mm²."
+            )
         return out
 
 

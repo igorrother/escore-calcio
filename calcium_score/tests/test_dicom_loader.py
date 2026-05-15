@@ -175,7 +175,7 @@ class TestWarnings:
         studies = load_input(two_series_folder)
         s2 = next(s for s in studies[0].series if s.series_number == 2)
         warnings = s2.warnings()
-        assert any("slice thickness" in w.lower() for w in warnings)
+        assert any("espessura" in w.lower() for w in warnings)
 
     def test_no_warning_for_3mm(self, two_series_folder: Path):
         studies = load_input(two_series_folder)

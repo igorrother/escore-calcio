@@ -19,11 +19,12 @@ from ..series_model import Series
 from .roi_tools import artery_color
 
 
-_AGE_UNITS = {"Y": "y", "M": "mo", "W": "w", "D": "d"}
+# DICOM AS unit -> pt-BR abbreviation: Y/M/W/D = anos/meses/semanas/dias
+_AGE_UNITS = {"Y": "a", "M": "m", "W": "s", "D": "d"}
 
 
 def _format_dicom_age(age: str) -> str:
-    """Convert DICOM PatientAge (e.g. '045Y') to a friendlier '45 y'.
+    """Convert DICOM PatientAge (e.g. '045Y') to a friendlier '45 a' (pt-BR).
 
     DICOM AS format: 3 digits + Y/M/W/D unit. Returns the input unchanged
     if it doesn't match the expected pattern, and "" if input is falsy.
@@ -39,12 +40,13 @@ def _format_dicom_age(age: str) -> str:
     suffix = _AGE_UNITS.get(age[3].upper(), age[3].lower())
     return f"{n} {suffix}"
 
+
 _RISK_COLORS = {
-    "none": QColor(120, 200, 120),
-    "minimal": QColor(120, 170, 220),
-    "mild": QColor(230, 220, 100),
-    "moderate": QColor(230, 160, 80),
-    "severe": QColor(220, 80, 80),
+    "nenhum": QColor(120, 200, 120),
+    "mínimo": QColor(120, 170, 220),
+    "leve": QColor(230, 220, 100),
+    "moderado": QColor(230, 160, 80),
+    "grave": QColor(220, 80, 80),
 }
 
 
@@ -61,7 +63,7 @@ class ScoreTable(QWidget):
         root.setSpacing(10)
 
         # Patient header
-        self._patient_lbl = QLabel("No study loaded")
+        self._patient_lbl = QLabel("Nenhum estudo carregado")
         self._patient_lbl.setWordWrap(True)
         bold = QFont()
         bold.setBold(True)
@@ -74,7 +76,7 @@ class ScoreTable(QWidget):
         root.addWidget(sep1)
 
         # Per-artery totals
-        title = QLabel("Per-artery Agatston score")
+        title = QLabel("Escore de Agatston por artéria")
         title.setFont(bold)
         root.addWidget(title)
 
@@ -108,7 +110,7 @@ class ScoreTable(QWidget):
         root.addWidget(sep2)
 
         # Grand total + risk
-        total_title = QLabel("Total Agatston score")
+        total_title = QLabel("Escore total de Agatston")
         total_title.setFont(bold)
         root.addWidget(total_title)
 
@@ -120,7 +122,7 @@ class ScoreTable(QWidget):
         self._total_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(self._total_lbl)
 
-        self._risk_lbl = QLabel("Risk: —")
+        self._risk_lbl = QLabel("Risco: —")
         self._risk_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._risk_lbl.setAutoFillBackground(True)
         risk_font = QFont()
@@ -136,7 +138,7 @@ class ScoreTable(QWidget):
 
     def set_series_info(self, series: Series | None) -> None:
         if series is None:
-            self._patient_lbl.setText("No study loaded")
+            self._patient_lbl.setText("Nenhum estudo carregado")
             return
 
         demo_bits = []
@@ -149,19 +151,19 @@ class ScoreTable(QWidget):
 
         if series.slice_thickness is not None:
             series_line = (
-                f"Series: {series.series_description or '(no description)'} "
-                f"({series.num_slices} slices, {series.slice_thickness:g} mm)"
+                f"Série: {series.series_description or '(sem descrição)'} "
+                f"({series.num_slices} fatias, {series.slice_thickness:g} mm)"
             )
         else:
             series_line = (
-                f"Series: {series.series_description or '(no description)'} "
-                f"({series.num_slices} slices)"
+                f"Série: {series.series_description or '(sem descrição)'} "
+                f"({series.num_slices} fatias)"
             )
 
         text = (
-            f"Patient: {series.patient_name or '(unknown)'}{demographics}\n"
+            f"Paciente: {series.patient_name or '(desconhecido)'}{demographics}\n"
             f"ID: {series.patient_id or '—'}\n"
-            f"Study date: {series.study_date or '—'}\n"
+            f"Data do estudo: {series.study_date or '—'}\n"
             f"{series_line}"
         )
         self._patient_lbl.setText(text)
@@ -185,7 +187,7 @@ class ScoreTable(QWidget):
         total = grand_total(self._lesions)
         self._total_lbl.setText(f"{total:.1f}")
         risk = risk_category(total)
-        self._risk_lbl.setText(f"Risk: {risk}")
+        self._risk_lbl.setText(f"Risco: {risk}")
         pal = self._risk_lbl.palette()
         pal.setColor(QPalette.ColorRole.Window, _RISK_COLORS.get(risk, QColor(180, 180, 180)))
         pal.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))

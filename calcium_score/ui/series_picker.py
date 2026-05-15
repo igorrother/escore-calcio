@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from ..series_model import Series, Study, annotate_candidates
 
-_COLUMNS = ["Series #", "Description", "Slices", "Thickness (mm)", "KVP", "Candidate"]
+_COLUMNS = ["Nº da série", "Descrição", "Fatias", "Espessura (mm)", "kVp", "Candidata"]
 _CANDIDATE_BG = QColor(60, 110, 60)
 
 
@@ -28,7 +28,7 @@ class SeriesPickerDialog(QDialog):
 
     def __init__(self, studies: list[Study], parent: QWidget | None = None):
         super().__init__(parent)
-        self.setWindowTitle("Select calcium-scoring series")
+        self.setWindowTitle("Selecione a série de escore de cálcio")
         self.resize(900, 480)
         self._chosen: Series | None = None
 
@@ -62,7 +62,7 @@ class SeriesPickerDialog(QDialog):
             self._series_in_rows.append(series)
             cells = [
                 str(series.series_number) if series.series_number is not None else "—",
-                series.series_description or "(no description)",
+                series.series_description or "(sem descrição)",
                 str(series.num_slices),
                 f"{series.slice_thickness:g}" if series.slice_thickness is not None else "—",
                 f"{series.kvp:g}" if series.kvp is not None else "—",
@@ -80,7 +80,7 @@ class SeriesPickerDialog(QDialog):
         self.table.doubleClicked.connect(self._accept_selection)
         layout.addWidget(self.table)
 
-        legend = QLabel("Highlighted rows are likely calcium-scoring series.")
+        legend = QLabel("Linhas destacadas são prováveis séries de escore de cálcio.")
         legend.setStyleSheet("color: gray;")
         layout.addWidget(legend)
 
@@ -88,15 +88,26 @@ class SeriesPickerDialog(QDialog):
             QDialogButtonBox.StandardButton.Open | QDialogButtonBox.StandardButton.Cancel,
             self,
         )
+        # Translate the standard buttons to pt-BR
+        open_btn = buttons.button(QDialogButtonBox.StandardButton.Open)
+        if open_btn is not None:
+            open_btn.setText("Abrir")
+        cancel_btn = buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        if cancel_btn is not None:
+            cancel_btn.setText("Cancelar")
         buttons.accepted.connect(self._accept_selection)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
     def _patient_header_text(self, studies: list[Study]) -> str:
         if not studies:
-            return "No studies found."
+            return "Nenhum estudo encontrado."
         st = studies[0]
-        return f"Patient: {st.patient_name or '(unknown)'}    ID: {st.patient_id or '—'}    Study date: {st.study_date or '—'}"
+        return (
+            f"Paciente: {st.patient_name or '(desconhecido)'}    "
+            f"ID: {st.patient_id or '—'}    "
+            f"Data do estudo: {st.study_date or '—'}"
+        )
 
     def _accept_selection(self) -> None:
         rows = self.table.selectionModel().selectedRows()

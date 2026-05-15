@@ -22,7 +22,7 @@ from skimage.measure import label
 HU_THRESHOLD: int = 130
 MIN_LESION_AREA_MM2: float = 1.0
 
-ARTERIES: tuple[str, ...] = ("LM", "LAD", "LCx", "RCA", "PDA")
+ARTERIES: tuple[str, ...] = ("TCE", "DA", "Cx", "CD", "DP")
 
 
 @dataclass
@@ -68,16 +68,16 @@ def lesion_score(area_mm2: float, max_hu: float) -> float:
 
 
 def risk_category(total: float) -> str:
-    """Standard Agatston risk classification for total CAC score."""
+    """Standard Agatston risk classification for total CAC score (pt-BR)."""
     if total <= 0:
-        return "none"
+        return "nenhum"
     if total <= 10:
-        return "minimal"
+        return "mínimo"
     if total <= 100:
-        return "mild"
+        return "leve"
     if total <= 400:
-        return "moderate"
-    return "severe"
+        return "moderado"
+    return "grave"
 
 
 def _score_mask(

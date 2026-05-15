@@ -5,14 +5,15 @@ from __future__ import annotations
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPixmap
 
-# Per-artery overlay colors. Alpha keeps the underlying CT visible through
-# the overlay; the same RGB is reused at full opacity for the toolbar icons.
+# Per-artery overlay colors (pt-BR keys). Alpha keeps the underlying CT
+# visible through the overlay; the same RGB is reused at full opacity for
+# the toolbar icons.
 ARTERY_RGB: dict[str, tuple[int, int, int]] = {
-    "LM":  (50, 120, 255),   # blue
-    "LAD": (230, 30, 30),    # red
-    "LCx": (240, 220, 30),   # yellow
-    "RCA": (250, 140, 30),   # orange
-    "PDA": (40, 200, 60),    # green
+    "TCE": (50, 120, 255),   # azul   (tronco da coronária esquerda)
+    "DA":  (230, 30, 30),    # vermelho (descendente anterior)
+    "Cx":  (240, 220, 30),   # amarelo (circunflexa)
+    "CD":  (250, 140, 30),   # laranja (coronária direita)
+    "DP":  (40, 200, 60),    # verde  (descendente posterior)
 }
 
 ARTERY_COLORS: dict[str, QColor] = {

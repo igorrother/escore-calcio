@@ -222,7 +222,7 @@ class SliceViewer(QGraphicsView):
         idx = self.state.current_index
         hit = self._lesion_at(idx, y, x)
         if hit is None:
-            self.status_message.emit("Click on an ROI to erase it.")
+            self.status_message.emit("Clique em uma ROI para apagá-la.")
             return
         arr = self._lesions_by_slice.get(idx, [])
         arr.remove(hit)
@@ -230,7 +230,7 @@ class SliceViewer(QGraphicsView):
             del self._lesions_by_slice[idx]
         self._render_slice()
         self.lesions_changed.emit()
-        self.status_message.emit(f"Erased {hit.artery} ROI.")
+        self.status_message.emit(f"ROI de {hit.artery} removida.")
 
     def _draw_candidate_overlay(self, hu_slice: np.ndarray) -> None:
         """Tint pixels >=130 HU that are not yet part of any ROI on this slice.
@@ -380,7 +380,7 @@ class SliceViewer(QGraphicsView):
                 if hit is not None:
                     if hit.artery == self.active_artery:
                         self.status_message.emit(
-                            f"This ROI is already assigned to {hit.artery}."
+                            f"Esta ROI já está atribuída a {hit.artery}."
                         )
                         return
                     old = hit.artery
@@ -388,7 +388,7 @@ class SliceViewer(QGraphicsView):
                     self._render_slice()
                     self.lesions_changed.emit()
                     self.status_message.emit(
-                        f"Reassigned ROI from {old} to {self.active_artery}."
+                        f"ROI reatribuída de {old} para {self.active_artery}."
                     )
                     return
 
@@ -404,7 +404,7 @@ class SliceViewer(QGraphicsView):
                 existing = self._existing_mask_on_slice(self.state.current_index)
                 if existing is not None and (les.mask & existing).any():
                     self.status_message.emit(
-                        "This calcification touches an existing ROI. Undo first if you want to re-score."
+                        "Esta calcificação encosta em uma ROI existente. Desfaça antes de marcar novamente."
                     )
                     return
                 self._add_lesion(les)
@@ -478,7 +478,7 @@ class SliceViewer(QGraphicsView):
         existing = self._existing_mask_on_slice(self.state.current_index)
         if existing is not None and (les.mask & existing).any():
             self.status_message.emit(
-                "Polygon overlaps an existing ROI. Undo first if you want to re-score."
+                "O polígono sobrepõe uma ROI existente. Desfaça antes de marcar novamente."
             )
             self._render_slice()
             return
