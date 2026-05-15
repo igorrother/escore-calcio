@@ -3,3 +3,5 @@ pydicom>=2.4
 numpy>=1.26
 scikit-image>=0.22
 pytest>=7.4
+# Build-only: bundle the app into a Windows .exe via build_windows.bat
+pyinstaller>=6.0
