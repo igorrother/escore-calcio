@@ -45,18 +45,48 @@ Sempre prefira a versão mais recente no topo da página.
 
 ## Executar no macOS
 
-1. Extraia o `.zip` (duplo clique já basta).
-2. Arraste `EscoreCalcio.app` para a pasta **Aplicativos** (ou execute direto
-   de onde estiver).
-3. Na **primeira execução**, o macOS pode bloquear o app com a mensagem
+1. Extraia o `.zip` (duplo clique já basta) e arraste `EscoreCalcio.app`
+   para a pasta **Aplicativos**.
+2. Dê **duplo clique** em `EscoreCalcio.app`.
+3. Na **primeira execução**, o macOS vai bloquear o app com uma mensagem como
    **"EscoreCalcio.app não pode ser aberto porque a Apple não pode verificar
-   se ele contém malware"**:
-   - **Botão direito** (ou Ctrl + clique) em `EscoreCalcio.app` → **Abrir**
-   - Confirme **Abrir** no diálogo
+   se ele contém malware"** ou **"foi bloqueado para proteger seu Mac"**.
+   Clique em **OK** / **Fechar** para descartar o aviso — a liberação é feita
+   nos próximos passos.
 
-   Só precisa fazer isso uma vez. A partir daí, basta duplo clique normal.
-   Mesmo motivo do Windows — o app ainda não está notarizado pela Apple.
+Os passos a partir daqui dependem da versão do macOS.
 
+### macOS Sequoia (15) ou mais recente — caso mais comum hoje
+
+A partir do macOS Sequoia, a Apple **removeu** o atalho de "Ctrl + clique →
+Abrir". Agora a liberação é feita pelos Ajustes do Sistema:
+
+1. Abra o menu **Apple** (canto superior esquerdo) → **Ajustes do Sistema…**
+2. Na barra lateral esquerda, clique em **Privacidade e Segurança**.
+3. Role a página até a seção **Segurança**. Logo após o bloqueio, aparece uma
+   linha com o texto *"'EscoreCalcio.app' foi bloqueado para proteger seu Mac"*
+   e um botão **Abrir Mesmo Assim** ao lado.
+4. Clique em **Abrir Mesmo Assim**.
+5. Autentique com **Touch ID** ou senha de administrador.
+6. O aviso reaparece — clique em **Abrir Mesmo Assim** novamente para confirmar.
+
+Pronto. Da próxima vez, basta duplo clique normal — o macOS lembra dessa
+exceção para o `EscoreCalcio.app`.
+
+### macOS Sonoma (14) ou mais antigo
+
+Nessas versões o atalho mais rápido ainda funciona:
+
+1. No Finder, **botão direito** (ou **Ctrl + clique**) em `EscoreCalcio.app`
+   → **Abrir**.
+2. Confirme **Abrir** no diálogo de aviso.
+
+Só precisa fazer isso uma vez por instalação.
+
+> **Por que esse aviso aparece?** O app ainda não é assinado/notarizado pela
+> Apple, então o Gatekeeper bloqueia por precaução. Não há malware — é o
+> mesmo motivo do aviso do Windows.
+>
 > Requer macOS 11 Big Sur ou mais recente, em Mac com chip Apple Silicon.
 
 ---
