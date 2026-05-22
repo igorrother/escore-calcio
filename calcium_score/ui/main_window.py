@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize, Qt, QUrl, Signal
 from PySide6.QtGui import (
     QAction,
     QActionGroup,
     QColor,
+    QDesktopServices,
     QDragEnterEvent,
     QDragMoveEvent,
     QDropEvent,
@@ -31,9 +32,15 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import __version__
 from ..dicom_loader import load_input, load_pixel_volume
 from ..scoring import ARTERIES, Lesion
 from ..series_model import Series, Study
+from ..update_check import (
+    UpdateInfo,
+    fetch_latest_release_async,
+    is_newer_version,
+)
 from .disclaimer import AboutDialog
 from .roi_tools import (
     artery_icon,
@@ -49,6 +56,9 @@ log = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
+    # Emitted from the update-check worker thread; Qt marshals to GUI thread.
+    _update_check_finished = Signal(object, bool)  # (UpdateInfo|None, is_manual)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Escore de Cálcio de Agatston — ferramenta de pesquisa")
@@ -62,6 +72,9 @@ class MainWindow(QMainWindow):
 
         self._set_tools_enabled(False)
         self.setAcceptDrops(True)
+
+        self._update_check_finished.connect(self._on_update_check_finished)
+        self._kick_off_update_check(manual=False)
 
     # ---------- UI scaffold ----------
     def _build_menu(self) -> None:
@@ -85,6 +98,10 @@ class MainWindow(QMainWindow):
         file_menu.addAction(quit_action)
 
         help_menu = menubar.addMenu("Aj&uda")
+        check_updates = QAction("&Verificar atualizações…", self)
+        check_updates.triggered.connect(lambda: self._kick_off_update_check(manual=True))
+        help_menu.addAction(check_updates)
+        help_menu.addSeparator()
         about = QAction("&Sobre", self)
         about.triggered.connect(self._show_about)
         help_menu.addAction(about)
@@ -391,6 +408,48 @@ class MainWindow(QMainWindow):
 
     def _show_about(self) -> None:
         AboutDialog(self).exec()
+
+    # ---------- update check ----------
+    def _kick_off_update_check(self, manual: bool) -> None:
+        fetch_latest_release_async(
+            lambda info: self._update_check_finished.emit(info, manual)
+        )
+
+    def _on_update_check_finished(self, info: UpdateInfo | None, manual: bool) -> None:
+        if info is None:
+            if manual:
+                QMessageBox.warning(
+                    self,
+                    "Verificação de atualizações",
+                    "Não foi possível verificar atualizações. "
+                    "Verifique sua conexão com a internet e tente novamente.",
+                )
+            return
+
+        if not is_newer_version(info.latest_version, __version__):
+            if manual:
+                QMessageBox.information(
+                    self,
+                    "Verificação de atualizações",
+                    f"Você já está usando a versão mais recente (v{__version__}).",
+                )
+            return
+
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Information)
+        box.setWindowTitle("Atualização disponível")
+        box.setText(
+            f"Uma nova versão está disponível: <b>{info.latest_version}</b><br>"
+            f"Você está usando v{__version__}."
+        )
+        box.setInformativeText(
+            "Abra a página de releases para baixar a versão mais recente."
+        )
+        download_btn = box.addButton("Abrir página de download", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Mais tarde", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        if box.clickedButton() is download_btn:
+            QDesktopServices.openUrl(QUrl(info.release_url))
 
     # ---------- drag and drop ----------
     @staticmethod
