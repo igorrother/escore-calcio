@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QProgressDialog,
     QPushButton,
@@ -210,6 +211,7 @@ class MainWindow(QMainWindow):
         self._viewer.cursor_hu_changed.connect(self._on_cursor_hu)
         self._viewer.status_message.connect(self._on_status_message)
         self._viewer.overlay_visibility_changed.connect(self._on_overlay_visibility_changed)
+        self._viewer.artery_menu_requested.connect(self._show_artery_menu)
 
     def _build_status_bar(self) -> None:
         bar = QStatusBar(self)
@@ -353,6 +355,16 @@ class MainWindow(QMainWindow):
         artery = action.data()
         if artery:
             self._viewer.set_artery(artery)
+
+    def _show_artery_menu(self, global_pos) -> None:
+        # Reuses the toolbar's QActions, so triggering from the menu drives
+        # the QActionGroup's exclusive selection and updates the toolbar.
+        if not any(act.isEnabled() for act in self._artery_actions.values()):
+            return
+        menu = QMenu(self)
+        for artery in ARTERIES:
+            menu.addAction(self._artery_actions[artery])
+        menu.exec(global_pos)
 
     def _on_lesion_added(self, les: Lesion) -> None:
         self._score_table.add_lesion(les)

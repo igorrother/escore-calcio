@@ -102,7 +102,9 @@ Só precisa fazer isso uma vez por instalação.
 3. **Marcar as calcificações** — pixels ≥ 130 HU aparecem em **rosa**
    ("marcação candidata"). Na barra de ferramentas:
    - **Artéria** — escolha a coronária que está marcando: **TCE, DA, Cx, CD, DP**
-     (botões coloridos, cada artéria com sua cor)
+     (botões coloridos, cada artéria com sua cor). Atalho: **clique com o
+     botão direito** sobre a imagem para abrir o seletor de artéria
+     diretamente onde o cursor estiver.
    - **Marcação** — *clique* em uma calcificação para preenchê-la
      automaticamente, ou *clique e arraste* para desenhar uma ROI à mão
      livre. O app detecta qual dos dois você está fazendo — não é preciso
@@ -124,7 +126,8 @@ Só precisa fazer isso uma vez por instalação.
 | Ação | Atalho |
 |---|---|
 | Próxima/anterior fatia | scroll do mouse, ↑/↓, PageUp/PageDown |
-| Ajustar contraste (W/L) | arrastar com **botão direito** |
+| Trocar artéria ativa | **clicar** com o botão direito sobre a imagem |
+| Ajustar contraste (W/L) | **arrastar** com o botão direito |
 | Cancelar polígono em desenho | **Esc** |
 | Abrir pasta | Ctrl + O |
 | Abrir ZIP | Ctrl + Shift + O |

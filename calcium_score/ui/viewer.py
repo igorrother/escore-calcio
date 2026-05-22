@@ -82,6 +82,9 @@ class SliceViewer(QGraphicsView):
     # the user scored a new ROI while overlays were hidden — main_window
     # listens so it can sync the toolbar toggle's checked state.
     overlay_visibility_changed = Signal()
+    # Right-click on the viewer (without a window/level drag) — main_window
+    # shows the artery picker menu at the supplied global screen position.
+    artery_menu_requested = Signal(QPoint)
 
     # TOOL_AUTO is the default marking tool: a quick left-click flood-fills
     # at the click point, while click-and-drag draws a free-hand polygon.
@@ -135,7 +138,10 @@ class SliceViewer(QGraphicsView):
         self._show_lesion_overlays: bool = True
         self._show_candidate_overlay: bool = True
 
-        # Right-button window/level drag
+        # Right-button: a press is "pending" until the user drags past the
+        # system threshold (commits to W/L drag — _wl_start becomes set) or
+        # releases without dragging (opens the artery context menu).
+        self._rmb_press_widget_pos: QPoint | None = None
         self._wl_start: QPoint | None = None
         self._wl_initial: tuple[float, float] | None = None
 
@@ -393,8 +399,9 @@ class SliceViewer(QGraphicsView):
             return
 
         if event.button() == Qt.MouseButton.RightButton:
-            # Start window/level drag
-            self._wl_start = event.pos()
+            # Defer: a release without drag opens the artery menu;
+            # a drag past startDragDistance commits to window/level.
+            self._rmb_press_widget_pos = event.pos()
             self._wl_initial = (self.state.window_width, self.state.window_level)
             return
 
@@ -428,6 +435,18 @@ class SliceViewer(QGraphicsView):
         if not self.state:
             super().mouseMoveEvent(event)
             return
+
+        # Right-button: commit to W/L drag once the cursor moves past the
+        # system drag threshold, anchored on the original press point so
+        # the math is identical to "started W/L drag on press".
+        if (
+            self._rmb_press_widget_pos is not None
+            and self._wl_start is None
+            and self._wl_initial is not None
+        ):
+            delta = (event.pos() - self._rmb_press_widget_pos).manhattanLength()
+            if delta >= QApplication.startDragDistance():
+                self._wl_start = self._rmb_press_widget_pos
 
         if self._wl_start is not None and self._wl_initial is not None:
             dx = event.pos().x() - self._wl_start.x()
@@ -469,8 +488,14 @@ class SliceViewer(QGraphicsView):
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.RightButton:
+            was_clean_click = (
+                self._wl_start is None and self._rmb_press_widget_pos is not None
+            )
+            self._rmb_press_widget_pos = None
             self._wl_start = None
             self._wl_initial = None
+            if was_clean_click:
+                self.artery_menu_requested.emit(self.mapToGlobal(event.pos()))
             return
         if event.button() == Qt.MouseButton.LeftButton:
             if self._drawing_polygon:
