@@ -17,6 +17,7 @@ from PySide6.QtGui import (
     QWheelEvent,
 )
 from PySide6.QtWidgets import (
+    QApplication,
     QGraphicsItem,
     QGraphicsPathItem,
     QGraphicsPixmapItem,
@@ -82,8 +83,11 @@ class SliceViewer(QGraphicsView):
     # listens so it can sync the toolbar toggle's checked state.
     overlay_visibility_changed = Signal()
 
-    TOOL_FLOOD = "flood"
-    TOOL_POLYGON = "polygon"
+    # TOOL_AUTO is the default marking tool: a quick left-click flood-fills
+    # at the click point, while click-and-drag draws a free-hand polygon.
+    # The decision is deferred until mouseRelease so the user doesn't have
+    # to pick up front.
+    TOOL_AUTO = "auto"
     TOOL_ERASER = "eraser"
 
     def __init__(self, parent: QWidget | None = None):
@@ -106,8 +110,15 @@ class SliceViewer(QGraphicsView):
         self._lesions_by_slice: dict[int, list[Lesion]] = {}
 
         # Tool state
-        self.active_tool: str = self.TOOL_FLOOD
+        self.active_tool: str = self.TOOL_AUTO
         self.active_artery: str = "LAD"
+
+        # Auto-tool: a left-press is "pending" until the user either releases
+        # (click → flood-fill) or drags past the system drag threshold
+        # (commit to polygon, back-filling the press point as point 0).
+        self._press_widget_pos: QPoint | None = None
+        self._press_image_pos: tuple[int, int] | None = None
+        self._press_committed_to_polygon: bool = False
 
         # Free-hand polygon drafting state. The path is the source of truth;
         # the QGraphicsPathItem is just its on-screen representation. Going
@@ -142,10 +153,11 @@ class SliceViewer(QGraphicsView):
         self.slice_changed.emit(self.state.current_index)
 
     def set_tool(self, tool: str) -> None:
-        if tool not in (self.TOOL_FLOOD, self.TOOL_POLYGON, self.TOOL_ERASER):
+        if tool not in (self.TOOL_AUTO, self.TOOL_ERASER):
             return
         self.active_tool = tool
         self._cancel_polygon_preview()
+        self._reset_auto_press_state()
 
     def set_artery(self, artery: str) -> None:
         self.active_artery = artery
@@ -398,44 +410,17 @@ class SliceViewer(QGraphicsView):
                 self._erase_at(y, x)
                 return
 
-            if self.active_tool == self.TOOL_FLOOD:
-                # If the click landed on an existing ROI, reassign that
-                # lesion to the active artery (or no-op if it's already
-                # this artery) instead of trying to add a duplicate.
-                hit = self._lesion_at(self.state.current_index, y, x)
-                if hit is not None:
-                    if hit.artery == self.active_artery:
-                        self.status_message.emit(
-                            f"Esta ROI já está atribuída a {hit.artery}."
-                        )
-                        return
-                    old = hit.artery
-                    hit.artery = self.active_artery
-                    self._render_slice()
-                    self.lesions_changed.emit()
-                    self.status_message.emit(
-                        f"ROI reatribuída de {old} para {self.active_artery}."
-                    )
-                    return
+            # Reassign-on-press for existing ROIs runs immediately — the
+            # drag-to-polygon path isn't useful inside an ROI.
+            hit = self._lesion_at(self.state.current_index, y, x)
+            if hit is not None:
+                self._reassign_lesion(hit)
+                return
 
-                les = score_flood_fill(
-                    hu_slice,
-                    (y, x),
-                    self.state.pixel_area_mm2,
-                    artery=self.active_artery,
-                    slice_index=self.state.current_index,
-                )
-                if les is None:
-                    return
-                existing = self._existing_mask_on_slice(self.state.current_index)
-                if existing is not None and (les.mask & existing).any():
-                    self.status_message.emit(
-                        "Esta calcificação encosta em uma ROI existente. Desfaça antes de marcar novamente."
-                    )
-                    return
-                self._add_lesion(les)
-            elif self.active_tool == self.TOOL_POLYGON:
-                self._start_polygon_preview(QPointF(x, y))
+            # Defer the click-vs-drag decision until release / first drag.
+            self._press_widget_pos = event.pos()
+            self._press_image_pos = (x, y)
+            self._press_committed_to_polygon = False
 
         super().mousePressEvent(event)
 
@@ -460,6 +445,19 @@ class SliceViewer(QGraphicsView):
             hu_slice = self.state.hu_volume[self.state.current_index]
             in_bounds = 0 <= x < hu_slice.shape[1] and 0 <= y < hu_slice.shape[0]
 
+            # Detect when a pending press becomes a drag and start the
+            # polygon preview from the original press point.
+            if (
+                self._press_widget_pos is not None
+                and not self._press_committed_to_polygon
+            ):
+                delta = (event.pos() - self._press_widget_pos).manhattanLength()
+                if delta >= QApplication.startDragDistance():
+                    assert self._press_image_pos is not None
+                    px, py = self._press_image_pos
+                    self._start_polygon_preview(QPointF(px, py))
+                    self._press_committed_to_polygon = True
+
             # Extend the free-hand polygon while the user is dragging.
             if self._drawing_polygon and in_bounds:
                 self._extend_polygon_preview(QPointF(x, y))
@@ -474,10 +472,58 @@ class SliceViewer(QGraphicsView):
             self._wl_start = None
             self._wl_initial = None
             return
-        if event.button() == Qt.MouseButton.LeftButton and self._drawing_polygon:
-            self._finish_polygon_drag()
-            return
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self._drawing_polygon:
+                self._finish_polygon_drag()
+                self._reset_auto_press_state()
+                return
+            if self._press_image_pos is not None:
+                x, y = self._press_image_pos
+                self._do_flood_fill_click(y, x)
+                self._reset_auto_press_state()
+                return
         super().mouseReleaseEvent(event)
+
+    def _reset_auto_press_state(self) -> None:
+        self._press_widget_pos = None
+        self._press_image_pos = None
+        self._press_committed_to_polygon = False
+
+    def _reassign_lesion(self, hit: Lesion) -> None:
+        """Reassign an existing ROI to the active artery, or no-op if same."""
+        if hit.artery == self.active_artery:
+            self.status_message.emit(
+                f"Esta ROI já está atribuída a {hit.artery}."
+            )
+            return
+        old = hit.artery
+        hit.artery = self.active_artery
+        self._render_slice()
+        self.lesions_changed.emit()
+        self.status_message.emit(
+            f"ROI reatribuída de {old} para {self.active_artery}."
+        )
+
+    def _do_flood_fill_click(self, y: int, x: int) -> None:
+        """Score a flood-fill ROI at image-pixel (y, x) on the current slice."""
+        assert self.state is not None
+        hu_slice = self.state.hu_volume[self.state.current_index]
+        les = score_flood_fill(
+            hu_slice,
+            (y, x),
+            self.state.pixel_area_mm2,
+            artery=self.active_artery,
+            slice_index=self.state.current_index,
+        )
+        if les is None:
+            return
+        existing = self._existing_mask_on_slice(self.state.current_index)
+        if existing is not None and (les.mask & existing).any():
+            self.status_message.emit(
+                "Esta calcificação encosta em uma ROI existente. Desfaça antes de marcar novamente."
+            )
+            return
+        self._add_lesion(les)
 
     def _finish_polygon_drag(self) -> None:
         """Close the free-hand polygon and score it (or cancel if too small)."""

@@ -103,8 +103,10 @@ Só precisa fazer isso uma vez por instalação.
    ("marcação candidata"). Na barra de ferramentas:
    - **Artéria** — escolha a coronária que está marcando: **TCE, DA, Cx, CD, DP**
      (botões coloridos, cada artéria com sua cor)
-   - **Ferramenta** — *Preenchimento* (clique uma calcificação) ou
-     *Mão livre* (clique e arraste em volta de uma área)
+   - **Marcação** — *clique* em uma calcificação para preenchê-la
+     automaticamente, ou *clique e arraste* para desenhar uma ROI à mão
+     livre. O app detecta qual dos dois você está fazendo — não é preciso
+     escolher antes.
    - **Borracha** — clique em uma ROI marcada para removê-la
    - **Olho com íris colorida** — oculta/mostra todos os overlays
    - **Olho com íris rosa** — oculta/mostra apenas a marcação candidata rosa

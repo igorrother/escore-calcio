@@ -18,7 +18,6 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
-    QComboBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -142,11 +141,12 @@ class MainWindow(QMainWindow):
         self._artery_actions["DA"].setChecked(True)
 
         toolbar.addSeparator()
-        toolbar.addWidget(QLabel(" Ferramenta: "))
-        self._tool_combo = QComboBox()
-        self._tool_combo.addItem("Preenchimento (clique)", userData=SliceViewer.TOOL_FLOOD)
-        self._tool_combo.addItem("Mão livre (clique e arraste)", userData=SliceViewer.TOOL_POLYGON)
-        toolbar.addWidget(self._tool_combo)
+        self._tool_hint_lbl = QLabel(" Clique = preencher · Arraste = mão livre ")
+        self._tool_hint_lbl.setToolTip(
+            "Um clique simples preenche a calcificação sob o cursor. "
+            "Clique e arraste para desenhar uma ROI à mão livre."
+        )
+        toolbar.addWidget(self._tool_hint_lbl)
 
         toolbar.addSeparator()
         self._eraser_action = QAction(eraser_icon(32), "Borracha", self)
@@ -204,7 +204,6 @@ class MainWindow(QMainWindow):
 
         # Wire signals
         self._artery_group.triggered.connect(self._on_artery_changed)
-        self._tool_combo.currentIndexChanged.connect(self._on_tool_changed)
         self._viewer.lesion_added.connect(self._on_lesion_added)
         self._viewer.lesions_changed.connect(self._on_lesions_changed)
         self._viewer.slice_changed.connect(self._on_slice_changed)
@@ -223,7 +222,7 @@ class MainWindow(QMainWindow):
     def _set_tools_enabled(self, enabled: bool) -> None:
         for act in self._artery_actions.values():
             act.setEnabled(enabled)
-        self._tool_combo.setEnabled(enabled and not self._eraser_action.isChecked())
+        self._tool_hint_lbl.setEnabled(enabled)
         self._eraser_action.setEnabled(enabled)
         self._show_all_action.setEnabled(enabled)
         self._show_candidate_action.setEnabled(enabled)
@@ -306,7 +305,7 @@ class MainWindow(QMainWindow):
         self._current_series = series
         self._viewer.load_volume(hu_volume, series.pixel_spacing)
         self._viewer.set_artery(self._current_artery())
-        self._viewer.set_tool(self._tool_combo.currentData())
+        self._viewer.set_tool(SliceViewer.TOOL_AUTO)
         self._score_table.clear_lesions()
         self._score_table.set_series_info(series)
         self._set_tools_enabled(True)
@@ -321,13 +320,6 @@ class MainWindow(QMainWindow):
         self._slice_lbl.update_from(
             self._viewer.state.current_index, hu_volume.shape[0]
         )
-
-    def _on_tool_changed(self, _index: int) -> None:
-        if self._eraser_action.isChecked():
-            return  # eraser is active; combo selection is queued for when it toggles off
-        tool = self._tool_combo.currentData()
-        if tool:
-            self._viewer.set_tool(tool)
 
     def _on_show_all_toggled(self, checked: bool) -> None:
         # "All overlays" toggle drives both viewer flags. The candidate
@@ -353,13 +345,9 @@ class MainWindow(QMainWindow):
         self._viewer.set_candidate_overlay_visible(self._show_candidate_action.isChecked())
 
     def _on_eraser_toggled(self, checked: bool) -> None:
-        if checked:
-            self._viewer.set_tool(SliceViewer.TOOL_ERASER)
-            self._tool_combo.setEnabled(False)
-        else:
-            self._tool_combo.setEnabled(True)
-            tool = self._tool_combo.currentData() or SliceViewer.TOOL_FLOOD
-            self._viewer.set_tool(tool)
+        self._viewer.set_tool(
+            SliceViewer.TOOL_ERASER if checked else SliceViewer.TOOL_AUTO
+        )
 
     def _on_artery_changed(self, action: QAction) -> None:
         artery = action.data()
