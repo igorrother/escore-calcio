@@ -30,9 +30,11 @@ from PySide6.QtWidgets import (
 
 from ..scoring import (
     HU_THRESHOLD,
+    MIN_LESION_AREA_MM2,
     Lesion,
     filter_small_components,
     score_flood_fill,
+    score_mask,
     score_polygon,
 )
 from .roi_tools import CANDIDATE_COLOR, artery_color
@@ -542,13 +544,7 @@ class SliceViewer(QGraphicsView):
         )
         if les is None:
             return
-        existing = self._existing_mask_on_slice(self.state.current_index)
-        if existing is not None and (les.mask & existing).any():
-            self.status_message.emit(
-                "Esta calcificação encosta em uma ROI existente. Desfaça antes de marcar novamente."
-            )
-            return
-        self._add_lesion(les)
+        self._add_candidate_resolving_overlap(les)
 
     def _finish_polygon_drag(self) -> None:
         """Close the free-hand polygon and score it (or cancel if too small)."""
@@ -572,14 +568,90 @@ class SliceViewer(QGraphicsView):
         if les is None:
             self._render_slice()
             return
-        existing = self._existing_mask_on_slice(self.state.current_index)
-        if existing is not None and (les.mask & existing).any():
-            self.status_message.emit(
-                "O polígono sobrepõe uma ROI existente. Desfaça antes de marcar novamente."
+        self._add_candidate_resolving_overlap(les)
+
+    def _add_candidate_resolving_overlap(self, candidate: Lesion) -> None:
+        """Add a newly-scored candidate lesion, resolving overlap with
+        existing ROIs by reassigning their artery and scoring only the
+        un-scored remainder as a new lesion.
+
+        Behavior when ``candidate.mask`` intersects existing ROIs on this
+        slice:
+          * every touched ROI is reassigned to ``candidate.artery``;
+          * the candidate's mask is trimmed to the pixels not already in
+            any existing ROI;
+          * if the trimmed remainder is still >=1 mm², it's added as a
+            new lesion of ``candidate.artery``.
+
+        This matches the user's intent ("lasso this area as artery X")
+        without double-counting any pixel.
+        """
+        assert self.state is not None
+        idx = self.state.current_index
+        arr = list(self._lesions_by_slice.get(idx, []))
+
+        touched: list[Lesion] = []
+        reassigned: list[Lesion] = []
+        for existing in arr:
+            if (candidate.mask & existing.mask).any():
+                touched.append(existing)
+                if existing.artery != candidate.artery:
+                    existing.artery = candidate.artery
+                    reassigned.append(existing)
+
+        # Trim candidate mask to pixels not yet in any existing ROI.
+        union = self._existing_mask_on_slice(idx)
+        trimmed_mask = candidate.mask & ~union if union is not None else candidate.mask
+
+        new_lesion: Lesion | None = None
+        if trimmed_mask.any():
+            hu_slice = self.state.hu_volume[idx]
+            scored = score_mask(
+                hu_slice,
+                trimmed_mask,
+                self.state.pixel_area_mm2,
+                artery=candidate.artery,
+                slice_index=idx,
             )
-            self._render_slice()
+            if scored is not None and scored.area_mm2 >= MIN_LESION_AREA_MM2:
+                new_lesion = scored
+
+        if new_lesion is None and not reassigned:
+            if touched:
+                # Entire candidate area was already covered by ROIs of the
+                # same artery — nothing to do.
+                self.status_message.emit(
+                    f"Esta área já está atribuída a {candidate.artery}."
+                )
             return
-        self._add_lesion(les)
+
+        if new_lesion is not None:
+            self._add_lesion(new_lesion)
+
+        if reassigned:
+            if new_lesion is None:
+                # _add_lesion already re-rendered if it ran; otherwise we
+                # need to render to reflect the reassigned artery colors.
+                self._render_slice()
+            self.lesions_changed.emit()
+
+        # Status message
+        if reassigned and new_lesion is not None:
+            n = len(reassigned)
+            noun = "ROI reatribuída" if n == 1 else f"{n} ROIs reatribuídas"
+            self.status_message.emit(
+                f"{noun} para {candidate.artery} e nova área marcada."
+            )
+        elif reassigned:
+            n = len(reassigned)
+            if n == 1:
+                self.status_message.emit(
+                    f"ROI reatribuída para {candidate.artery}."
+                )
+            else:
+                self.status_message.emit(
+                    f"{n} ROIs reatribuídas para {candidate.artery}."
+                )
 
     def _add_lesion(self, les: Lesion) -> None:
         # If the user is scoring while the lesion overlay is hidden,

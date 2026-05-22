@@ -90,7 +90,7 @@ def risk_category(total: float) -> str:
     return "muito acentuado"
 
 
-def _score_mask(
+def score_mask(
     hu_slice: np.ndarray,
     mask: np.ndarray,
     pixel_area_mm2: float,
@@ -144,7 +144,7 @@ def score_flood_fill(
     if target == 0:
         return None
     component_mask = labels == target
-    return _score_mask(
+    return score_mask(
         hu_slice,
         component_mask,
         pixel_area_mm2,
@@ -177,7 +177,7 @@ def score_polygon(
     poly_mask = np.zeros(hu_slice.shape, dtype=bool)
     poly_mask[rr, cc] = True
     calcium_mask = poly_mask & (hu_slice >= HU_THRESHOLD)
-    return _score_mask(
+    return score_mask(
         hu_slice,
         calcium_mask,
         pixel_area_mm2,
