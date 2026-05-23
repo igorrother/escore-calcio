@@ -35,6 +35,10 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest
 
+      - name: Generate icon files
+        shell: cmd
+        run: python tools\make_icons.py
+
       - name: Build .exe with PyInstaller
         shell: cmd
         run: pyinstaller --noconfirm score_app.spec
@@ -74,6 +78,9 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest
+
+      - name: Generate icon files
+        run: python tools/make_icons.py
 
       - name: Build .app with PyInstaller
         run: pyinstaller --noconfirm score_app_mac.spec

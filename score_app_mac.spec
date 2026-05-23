@@ -29,6 +29,7 @@ datas = (
     + collect_data_files("libjpeg")
     + collect_data_files("openjpeg")
     + collect_data_files("rle")
+    + [("icon.png", ".")]   # bundled so QApplication.setWindowIcon can find it
 )
 
 a = Analysis(
@@ -86,7 +87,7 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name="EscoreCalcio.app",
-    icon=None,
+    icon="icon.icns",
     bundle_identifier="com.igorrother.escorecalcio",
     version="1.0",
     info_plist={
